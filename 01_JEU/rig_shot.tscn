@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cb1rigshot"]
+
+[ext_resource type="Script" path="res://rig_shot.gd" id="1_rs"]
+
+[node name="RigShot" type="Node3D"]
+script = ExtResource("1_rs")

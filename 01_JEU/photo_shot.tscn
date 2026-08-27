@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cb1photoshot"]
+
+[ext_resource type="Script" path="res://photo_shot.gd" id="1_pshot"]
+
+[node name="PhotoShot" type="Node2D"]
+script = ExtResource("1_pshot")

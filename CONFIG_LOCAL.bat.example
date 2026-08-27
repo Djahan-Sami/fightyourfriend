@@ -1,0 +1,5 @@
+@echo off
+rem Copie ce fichier sous le nom CONFIG_LOCAL.bat puis adapte les deux chemins.
+rem CONFIG_LOCAL.bat reste local et ne sera jamais envoye sur GitHub.
+set "GODOT=C:\chemin\vers\Godot.exe"
+set "BLENDER=C:\chemin\vers\blender.exe"

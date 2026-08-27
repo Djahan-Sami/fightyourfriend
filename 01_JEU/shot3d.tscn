@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cb1shot3d"]
+
+[ext_resource type="Script" path="res://shot3d.gd" id="1_s3d"]
+
+[node name="Shot3D" type="Node3D"]
+script = ExtResource("1_s3d")

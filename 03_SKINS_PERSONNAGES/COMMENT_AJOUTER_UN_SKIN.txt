@@ -1,0 +1,10 @@
+Ajoute ici tes modeles de personnages au format .glb ou .gltf.
+
+Tous les modeles places ici restent ignores par Git et ne sont pas publies.
+
+Dans le jeu :
+1. Ouvre CHOISIR LES SKINS 3D.
+2. Clique sur ACTUALISER LA LISTE.
+3. Choisis un modele pour le combattant bleu et le combattant rouge.
+
+Les autres fichiers necessaires a un modele .gltf doivent rester avec lui dans ce dossier.

@@ -1,0 +1,19 @@
+COMMENT AJOUTER UN TERRAIN
+
+Chaque terrain est une paire de deux images portant le meme nom :
+
+- Nom.png : decor vertical derriere les combattants.
+- Nom_sol.png : revetement vu du dessus, applique au vrai sol 3D.
+
+Exemple fourni :
+- Toit_de_la_ville_exemple.png
+- Toit_de_la_ville_exemple_sol.png
+
+Formats acceptes : .png, .jpg, .jpeg et .webp.
+
+Dans le menu, ouvre CHOISIR LE TERRAIN, clique sur ACTUALISER LA LISTE,
+selectionne le terrain puis lance un nouveau combat.
+
+Conseils :
+- Le decor fonctionne mieux en 16:9, sans personnage ni texte.
+- Le fichier _sol doit etre une texture carree vue du dessus, sans perspective.

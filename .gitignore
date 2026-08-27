@@ -1,0 +1,40 @@
+# Godot caches
+**/.godot/
+**/.import/
+
+# Python caches
+**/__pycache__/
+*.py[cod]
+
+# Blender automatic backups
+*.blend1
+*.blend2
+*.blend@
+*.autosave
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Paths to local Godot and Blender installations
+CONFIG_LOCAL.bat
+
+# Private character skins, photos, generated models and local backups
+05_SAUVEGARDES/
+03_SKINS_PERSONNAGES/*
+!03_SKINS_PERSONNAGES/COMMENT_AJOUTER_UN_SKIN.txt
+
+# Large external source repositories and personal model-generation utilities
+02_ATELIER_ANIMATIONS/third_party/
+02_ATELIER_ANIMATIONS/assets/humanoid_cc0/
+02_ATELIER_ANIMATIONS/create_cc0_humanoid_studio.py
+02_ATELIER_ANIMATIONS/build_photo_fighters.py
+02_ATELIER_ANIMATIONS/generate_hunyuan_models.py
+02_ATELIER_ANIMATIONS/prepare_textured_hunyuan_skins.py
+02_ATELIER_ANIMATIONS/pad_character_atlases.py
+
+# Temporary reports
+*.log

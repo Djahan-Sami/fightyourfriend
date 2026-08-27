@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://test_external_animation.gd" id="1_external"]
+
+[node name="TestExternalAnimation" type="Node"]
+script = ExtResource("1_external")

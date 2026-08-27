@@ -1,0 +1,19 @@
+RAGDOLL BRAWL - ORGANISATION
+
+01_JEU
+  Fichiers techniques du jeu Godot. Utilise LANCER_LE_JEU.bat pour jouer.
+
+02_ATELIER_ANIMATIONS
+  Fichier Blender et outils pour creer ou modifier les animations.
+  Utilise ANIMER_LES_COUPS.bat pour ouvrir l'atelier.
+
+03_SKINS_PERSONNAGES
+  Depose ici les modeles .glb ou .gltf des combattants.
+  GitHub contient seulement un exemple libre. Tes skins personnels restent locaux.
+
+04_SKINS_TERRAINS
+  Dossier reserve aux apparences des terrains.
+
+05_SAUVEGARDES
+  Sauvegardes, anciennes versions et essais techniques. Rien n'a ete supprime.
+  Ce dossier reste local et n'est jamais envoye sur GitHub.

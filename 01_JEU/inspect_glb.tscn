@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cb1inspectglb"]
+
+[ext_resource type="Script" path="res://inspect_glb.gd" id="1_ig"]
+
+[node name="InspectGLB" type="Node3D"]
+script = ExtResource("1_ig")

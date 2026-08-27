@@ -1,0 +1,2 @@
+# Les fichiers Blender servent uniquement a l'atelier externe. Godot ne doit
+# pas tenter de les reimporter comme ressources du jeu.
