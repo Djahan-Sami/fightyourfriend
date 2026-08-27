@@ -17,6 +17,7 @@ var _stage_entries: Array[Dictionary] = []
 var _reset_button: Button
 var _capture_player := -1
 var _capture_action := ""
+var _last_hover_sound_ms := 0
 
 
 func _ready() -> void:
@@ -66,7 +67,7 @@ func _build_main_page() -> void:
 	var column := _panel(Vector2(650, 650))
 	_main_page = column.get_parent().get_parent().get_parent()
 	var title := Label.new()
-	title.text = "RAGDOLL BRAWL"
+	title.text = "FIGHT YOUR FRIEND"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 42)
 	title.add_theme_color_override("font_color", Color(1.0, 0.77, 0.25))
@@ -349,6 +350,9 @@ func _menu_button(text: String, font_size := 17) -> Button:
 		normal.border_color = Color(1.0, 0.82, 0.36, 1.0)
 		hover.bg_color = Color(0.96, 0.61, 0.16, 1.0)
 		pressed.bg_color = Color(0.70, 0.36, 0.07, 1.0)
+	button.mouse_entered.connect(_play_ui_hover)
+	button.focus_entered.connect(_play_ui_hover)
+	button.pressed.connect(_play_ui_confirm)
 	return button
 
 
@@ -365,6 +369,21 @@ func _style_option(option: OptionButton) -> void:
 	hover.bg_color = Color(0.23, 0.38, 0.64, 1.0)
 	option.add_theme_stylebox_override("hover", hover)
 	option.add_theme_stylebox_override("pressed", hover)
+	option.mouse_entered.connect(_play_ui_hover)
+	option.focus_entered.connect(_play_ui_hover)
+	option.item_selected.connect(func(_index: int): _play_ui_confirm())
+
+
+func _play_ui_hover() -> void:
+	var now := Time.get_ticks_msec()
+	if now - _last_hover_sound_ms < 70:
+		return
+	_last_hover_sound_ms = now
+	SFX.play_global("ui_hover", -15.0)
+
+
+func _play_ui_confirm() -> void:
+	SFX.play_global("ui_confirm", -11.0)
 
 
 func _add_section(parent: VBoxContainer, text: String) -> void:

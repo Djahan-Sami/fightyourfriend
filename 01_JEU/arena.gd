@@ -124,6 +124,7 @@ func _ready() -> void:
 	cam.make_current()
 
 	_sfx = AudioStreamPlayer.new()
+	_sfx.max_polyphony = 8
 	add_child(_sfx)
 
 	_build_walls()
@@ -223,6 +224,7 @@ func _process(delta: float) -> void:
 				phase = Phase.FIGHT
 				banner = "COMBAT !"
 				phase_t = 0.6
+				SFX.play(_sfx, "fight", -7.0)
 				for f in fighters:
 					f.frozen = false
 		Phase.FIGHT:
@@ -234,6 +236,7 @@ func _process(delta: float) -> void:
 					phase = Phase.MATCH_END
 					banner = "JOUEUR %d GAGNE" % (1 if rounds[0] > rounds[1] else 2)
 					phase_t = 3.0
+					SFX.play(_sfx, "victory", -5.0)
 				else:
 					_start_round(round_no + 1)
 		Phase.MATCH_END:

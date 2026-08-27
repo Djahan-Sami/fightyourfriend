@@ -357,6 +357,7 @@ var _still := 0.0
 var _walk_cycle := 0.34
 var _walk_dir_local := 0.0
 var _walk_last_world_x := INF
+var _walk_step_half := -1
 var _flash := 0.0
 var _hold := 0.0
 var _escape := 0.0
@@ -466,6 +467,7 @@ func _ready() -> void:
 
 	sfx = AudioStreamPlayer2D.new()
 	sfx.max_distance = 2200.0
+	sfx.max_polyphony = 8
 	add_child(sfx)
 
 	_pose = _copy_pose(POSES["idle"])
@@ -530,6 +532,7 @@ func _land_fx(was_air: bool, vy_before: float) -> void:
 	if was_air and is_on_floor() and vy_before > 320.0:
 		Arena.dust(global_position, clampf(vy_before / 700.0, 0.3, 1.7))
 		Arena.shake(clampf(vy_before / 260.0, 0.0, 7.0))
+		SFX.play2d(sfx, "land", -10.0, clampf(0.92 - vy_before / 5000.0, 0.72, 0.92))
 
 
 func _separate() -> void:
@@ -605,6 +608,7 @@ func _tick_block(delta: float) -> void:
 	block_energy -= BLOCK_DRAIN * delta
 	if block_energy <= 0.0:
 		block_energy = 0.0
+		SFX.play2d(sfx, "guard_break", -3.0)
 		_hurt_pose_name = "hurt_body"
 		_enter_hurt(BLOCK_BREAK, Vector2(-120 * facing, -100))
 		return
@@ -1158,7 +1162,9 @@ func on_hit(mv: Dictionary, dir: float, extra_stun: float,
 	Arena.impact(at, Vector2(kb.x * dir, kb.y), impact_color, dmg / 9.0)
 	Arena.shake(2.0 + dmg * 0.45)
 	Arena.hitstop(int(clampf(24.0 + dmg * 2.6, 24.0, 105.0)))
-	SFX.play2d(sfx, "hit_heavy" if dmg >= 12.0 else "hit_light", -4.0)
+	var impact_sound := "hit_head" if headshot else (
+		"hit_heavy" if dmg >= 15.0 else ("hit_body" if dmg >= 9.0 else "hit_light"))
+	SFX.play2d(sfx, impact_sound, -2.5)
 
 
 func take_damage(amount: float, kb: Vector2, stun: float) -> void:
@@ -1233,6 +1239,7 @@ func reset_round() -> void:
 	_walk_cycle = 0.34
 	_walk_dir_local = 0.0
 	_walk_last_world_x = INF
+	_walk_step_half = -1
 	_buf = ""
 	_buf_t = 0.0
 	move_name = ""
@@ -1421,6 +1428,7 @@ func _animate(delta: float) -> void:
 	else:
 		_walk_last_world_x = INF
 		_walk_dir_local = 0.0
+		_walk_step_half = -1
 	if state == State.ATTACK:
 		tgt = _attack_timeline_pose()
 		_motion = CombatMotion.sample_attack(move_name, _attack_total_progress())
@@ -1503,6 +1511,10 @@ func _walk_pose(_delta: float) -> Dictionary:
 	var step_len := 48.0 if local_dir > 0.0 else 40.0
 	var lift := 5.5 if local_dir > 0.0 else 4.0
 	_walk_cycle = fposmod(_walk_cycle + travelled / (step_len * 2.0), 1.0)
+	var step_half := int(floor(_walk_cycle * 2.0))
+	if travelled > 0.01 and step_half != _walk_step_half:
+		SFX.play2d(sfx, "step", -18.0, 1.06 if local_dir > 0.0 else 0.94)
+	_walk_step_half = step_half
 	_motion = CombatMotion.sample_gait(_walk_cycle, local_dir)
 	var front := _gait_foot(_walk_cycle, local_dir, step_len, lift)
 	var back := _gait_foot(fposmod(_walk_cycle + 0.5, 1.0), local_dir, step_len, lift)
