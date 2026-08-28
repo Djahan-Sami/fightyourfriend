@@ -14,7 +14,7 @@ class_name Fighter
 signal hp_changed
 signal ko
 
-enum State { IDLE, WALK, CROUCH, AIR, ATTACK, BLOCK, GRAB, GRABBING, GRABBED, HURT, KO }
+enum State { IDLE, WALK, CROUCH, AIR, ATTACK, BLOCK, GRAB, GRABBING, GRABBED, HURT, DOWN, GETUP, KO }
 
 const MAX_HP        := 160.0
 const GRAVITY       := 2000.0
@@ -30,20 +30,18 @@ const CROUCH_SPEED  := 90.0
 # Fenetre de memorisation d'un appui. Assez large pour couvrir la fin d'une
 # grosse recuperation, assez courte pour ne pas declencher un coup "fantome"
 # qu'on n'a plus voulu.
-const BUFFER_TIME   := 0.16
-const BLOCK_RAISE   := 0.16
+const BUFFER_TIME   := 0.22
+const BLOCK_RAISE   := 0.10
 const BLOCK_DRAIN   := 0.0   # 0 = la garde ne se vide QUE sur impact
 const BLOCK_REGEN   := 0.26
 const BLOCK_BREAK   := 1.10
-const CHIP_RATIO    := 0.16
+const CHIP_RATIO    := 0.12
 # Drain de garde proportionnel aux degats : casser une garde demande de placer
 # de gros coups, pas de repeter le plus rapide. Avec la constante forfaitaire
 # d'avant, le jab cassait la garde deux fois plus vite qu'un coup de pied saute.
-const GUARD_DRAIN   := 0.022
+const GUARD_DRAIN   := 0.018
 # Recul en garde : seul le defenseur glisse, l'attaquant ne bouge pas. C'est ce
 # qui recree la distance et empeche un coup rapide de boucler sur place.
-const BLOCK_PUSH_BASE    := 200.0
-const BLOCK_PUSH_PER_DMG := 12.0
 
 const GRAB_STARTUP  := 0.06
 const GRAB_ACTIVE   := 0.14
@@ -58,12 +56,15 @@ const THROWS := {
 	"front": {"kb": Vector2(640, -180), "dmg": 1.05, "stun": 0.58, "pose": "boot_throw"},
 	"back":  {"kb": Vector2(-620, -360), "dmg": 1.15, "stun": 0.68, "pose": "tomoe"},
 	"up":    {"kb": Vector2(150, -780), "dmg": 1.05, "stun": 0.70, "pose": "grab_uppercut"},
-	"down":  {"kb": Vector2(120, 420), "dmg": 1.40, "stun": 0.72, "pose": "knee_crush"},
+	"down":  {"kb": Vector2(120, 420), "dmg": 1.20, "stun": 0.72, "pose": "knee_crush"},
 }
 const ESCAPE_NEEDED := 5.0
 const ESCAPE_DECAY  := 3.0
 const GRAB_PUNISH   := 0.80
 const HEAD_DAMAGE_MULTIPLIER := 1.20
+const KNOCKDOWN_HOLD := 0.30
+const GETUP_TIME     := 0.38
+const WAKEUP_SAFETY  := 0.18
 
 # ============================================================
 #  TABLE DES ATTAQUES  <- tout le tuning est ici
@@ -74,13 +75,13 @@ const MOVES := {
 	"jab": {
 		"startup": 0.05, "active": 0.05, "recover": 0.15,
 		"box": Vector2(42, -82), "radius": 18.0,
-		"dmg": 5.5, "kb": Vector2(260, -40), "hitstun": 0.2167, "blockstun": 0.15,
+		"dmg": 5.5, "kb": Vector2(260, -40), "hitstun": 0.1833, "blockstun": 0.15,
 		"pose": "punch_mid",
 	},
 	"uppercut": {
-		"startup": 0.25, "active": 0.0833, "recover": 0.2667,
+		"startup": 0.2167, "active": 0.0833, "recover": 0.2667,
 		"box": Vector2(34, -84), "radius": 24.0,
-		"dmg": 15.0, "kb": Vector2(140, -420), "hitstun": 0.4167, "blockstun": 0.15,
+		"dmg": 18.0, "kb": Vector2(140, -420), "hitstun": 0.4167, "blockstun": 0.15,
 		"pose": "punch_up",
 	},
 	"body_hook": {
@@ -92,13 +93,13 @@ const MOVES := {
 	"hook": {
 		"startup": 0.1333, "active": 0.1333, "recover": 0.2167,
 		"box": Vector2(40, -88), "radius": 19.0,
-		"dmg": 13.0, "kb": Vector2(330, -105), "hitstun": 0.35, "blockstun": 0.1667,
+		"dmg": 13.0, "kb": Vector2(330, -105), "hitstun": 0.3333, "blockstun": 0.1667,
 		"pose": "hook",
 	},
 	"spinning_backfist": {
 		"startup": 0.25, "active": 0.0833, "recover": 0.2833,
 		"box": Vector2(47, -78), "radius": 21.0,
-		"dmg": 19.0, "kb": Vector2(410, -150), "hitstun": 0.45, "blockstun": 0.15,
+		"dmg": 18.0, "kb": Vector2(410, -150), "hitstun": 0.45, "blockstun": 0.15,
 		"pose": "spinning_backfist",
 	},
 	"air_punch": {
@@ -116,11 +117,11 @@ const MOVES := {
 	"air_hammer": {
 		"startup": 0.2333, "active": 0.0667, "recover": 0.1833,
 		"box": Vector2(32, -20), "radius": 24.0,
-		"dmg": 12.0, "kb": Vector2(150, 300), "hitstun": 0.3167, "blockstun": 0.15,
+		"dmg": 14.0, "kb": Vector2(150, 300), "hitstun": 0.3167, "blockstun": 0.15,
 		"pose": "air_hammer",
 	},
 	"air_cross": {
-		"startup": 0.1333, "active": 0.2667, "recover": 0.15,
+		"startup": 0.1667, "active": 0.2667, "recover": 0.2,
 		"box": Vector2(52, -48), "radius": 21.0,
 		"dmg": 11.0, "kb": Vector2(300, -130), "hitstun": 0.2667, "blockstun": 0.1333,
 		"pose": "air_cross",
@@ -132,27 +133,27 @@ const MOVES := {
 		"pose": "air_backfist",
 	},
 	"middle_kick": {
-		"startup": 0.1, "active": 0.0667, "recover": 0.2333,
+		"startup": 0.1333, "active": 0.0667, "recover": 0.2333,
 		"box": Vector2(58, -48), "radius": 24.0,
-		"dmg": 11.0, "kb": Vector2(430, -180), "hitstun": 0.3333, "blockstun": 0.1667,
+		"dmg": 10.0, "kb": Vector2(430, -180), "hitstun": 0.3, "blockstun": 0.1667,
 		"pose": "middle_kick",
 	},
 	"high_kick": {
-		"startup": 0.1167, "active": 0.0667, "recover": 0.2833,
+		"startup": 0.15, "active": 0.0667, "recover": 0.2833,
 		"box": Vector2(48, -84), "radius": 24.0,
-		"dmg": 15.0, "kb": Vector2(300, -330), "hitstun": 0.4667, "blockstun": 0.1667,
+		"dmg": 14.0, "kb": Vector2(300, -330), "hitstun": 0.4, "blockstun": 0.1667,
 		"pose": "kick_high",
 	},
 	"sweep": {
-		"startup": 0.1167, "active": 0.0833, "recover": 0.3167,
+		"startup": 0.1667, "active": 0.0833, "recover": 0.3167,
 		"box": Vector2(54, -16), "radius": 22.0,
-		"dmg": 9.0, "kb": Vector2(150, -260), "hitstun": 0.6, "blockstun": 0.1833,
+		"dmg": 8.0, "kb": Vector2(150, -260), "hitstun": 0.35, "blockstun": 0.1833,
 		"pose": "sweep",
 	},
 	"front_kick": {
-		"startup": 0.2, "active": 0.1, "recover": 0.2,
+		"startup": 0.2, "active": 0.1, "recover": 0.25,
 		"box": Vector2(57, -43), "radius": 23.0,
-		"dmg": 12.0, "kb": Vector2(370, -140), "hitstun": 0.3, "blockstun": 0.15,
+		"dmg": 18.0, "kb": Vector2(370, -140), "hitstun": 0.3, "blockstun": 0.15,
 		"pose": "front_kick",
 	},
 	"spinning_kick": {
@@ -168,27 +169,27 @@ const MOVES := {
 		"pose": "air_kick",
 	},
 	"air_rising_kick": {
-		"startup": 0.3333, "active": 0.1, "recover": 0.2167,
+		"startup": 0.2833, "active": 0.1, "recover": 0.2167,
 		"box": Vector2(34, -80), "radius": 24.0,
-		"dmg": 13.0, "kb": Vector2(150, -380), "hitstun": 0.3833, "blockstun": 0.1667,
+		"dmg": 15.0, "kb": Vector2(150, -380), "hitstun": 0.3833, "blockstun": 0.1667,
 		"pose": "air_rising_kick",
 	},
 	"dive_kick": {
 		"startup": 0.3333, "active": 0.1, "recover": 0.2167,
 		"box": Vector2(40, -18), "radius": 22.0,
-		"dmg": 12.0, "kb": Vector2(240, 260), "hitstun": 0.3333, "blockstun": 0.1833,
+		"dmg": 15.0, "kb": Vector2(240, 260), "hitstun": 0.3333, "blockstun": 0.1833,
 		"pose": "dive",
 	},
 	"air_side_kick": {
-		"startup": 0.1333, "active": 0.3333, "recover": 0.1833,
+		"startup": 0.1833, "active": 0.3333, "recover": 0.2333,
 		"box": Vector2(59, -44), "radius": 24.0,
 		"dmg": 13.0, "kb": Vector2(410, -150), "hitstun": 0.3167, "blockstun": 0.15,
 		"pose": "air_side_kick",
 	},
 	"air_roundhouse": {
-		"startup": 0.1, "active": 0.0667, "recover": 0.2333,
+		"startup": 0.15, "active": 0.0667, "recover": 0.2333,
 		"box": Vector2(56, -62), "radius": 27.0,
-		"dmg": 13.0, "kb": Vector2(450, -210), "hitstun": 0.4167, "blockstun": 0.1667,
+		"dmg": 12.0, "kb": Vector2(450, -210), "hitstun": 0.3167, "blockstun": 0.1667,
 		"pose": "air_roundhouse",
 	},
 }
@@ -366,6 +367,14 @@ var _grab_victim: Fighter = null
 var _throw_pending := false
 var _throw_dir := "front"
 var _spin := 0.0
+var _knockdown := false
+var _knockdown_landed := false
+var _getup_t := 0.0
+var _wakeup_safe_t := 0.0
+var _guard_broken := false
+var _combo_hits := 0
+var _combo_last_move := ""
+var _same_move_hits := 0
 var _turn_y := 0.0 # rotation complete du corps autour de l'axe vertical
 var _swing_a0 := 0.0            # angle du membre frappeur au moment de l'arme
 var _impact_pose_t := 0.0        # garantit que l'extension est visible meme si le coup touche vite
@@ -502,6 +511,7 @@ func _physics_process(delta: float) -> void:
 			facing = 1.0
 
 	_flash = maxf(0.0, _flash - delta * 6.0)
+	_wakeup_safe_t = maxf(0.0, _wakeup_safe_t - delta)
 	_age_buffer(delta)
 
 	match state:
@@ -514,7 +524,10 @@ func _physics_process(delta: float) -> void:
 		State.GRABBING:_tick_grabbing(delta)
 		State.GRABBED: _tick_grabbed(delta)
 		State.HURT:    _tick_hurt(delta)
-	if not _throw_pending and state not in [State.HURT, State.KO, State.GRABBED]:
+		State.DOWN:    _tick_down(delta)
+		State.GETUP:   _tick_getup(delta)
+	if not _throw_pending and state not in [State.HURT, State.DOWN, State.GETUP,
+			State.KO, State.GRABBED]:
 		_spin = move_toward(_spin, 0.0, delta * 8.0)
 
 	var was_air := not is_on_floor()
@@ -561,6 +574,7 @@ func _tick_ground(delta: float) -> void:
 	if _try_actions():
 		return
 	if _consume("jump"):
+		_wakeup_safe_t = 0.0
 		velocity.y = JUMP_VEL
 		state = State.AIR
 		SFX.play2d(sfx, "jump", -10.0)
@@ -609,7 +623,10 @@ func _tick_block(delta: float) -> void:
 	if block_energy <= 0.0:
 		block_energy = 0.0
 		SFX.play2d(sfx, "guard_break", -3.0)
+		Arena.combat_text(global_position + Vector2(0, -96), "GARDE BRISEE",
+			Color(1.0, 0.36, 0.22), 1.10)
 		_hurt_pose_name = "hurt_body"
+		_guard_broken = true
 		_enter_hurt(BLOCK_BREAK, Vector2(-120 * facing, -100))
 		return
 	if _try_actions():
@@ -647,6 +664,10 @@ func _process(_delta: float) -> void:
 func _age_buffer(delta: float) -> void:
 	# expiration en temps de jeu : un appui fait pendant le hit-stop
 	# survit au gel et part des qu'il reprend.
+	# Pendant une chute/relevee, le dernier ordre est conserve jusqu'au moment
+	# ou le combattant redevient controlable.
+	if state in [State.DOWN, State.GETUP]:
+		return
 	_buf_t = maxf(0.0, _buf_t - delta)
 	if _buf_t <= 0.0:
 		_buf = ""
@@ -724,6 +745,7 @@ func _start_move(name_: String) -> bool:
 		# Aucun coup de secours : pas de GLB exporte, pas d'attaque.
 		return false
 	_move = AttackLibrary.apply_to_move(name_, MOVES[name_])
+	_wakeup_safe_t = 0.0
 	move_name = name_
 	_external_clip_info = clip_info
 	_root_motion_last = 0.0
@@ -803,8 +825,11 @@ func _poll_hit_immediate() -> void:
 		var other = (hit["collider"] as Node).get_parent()
 		if other == self or not (other is Fighter):
 			continue
+		if not (other as Fighter)._can_receive_strike():
+			continue
 		_hit_done = true
-		_resolve(other)
+		if not Arena.queue_strike(self, other):
+			_resolve(other)
 		return
 
 
@@ -813,17 +838,26 @@ func _poll_hit() -> void:
 		var other = a.get_parent()
 		if other == self or not (other is Fighter):
 			continue
+		if not (other as Fighter)._can_receive_strike():
+			continue
 		_hit_done = true
-		_resolve(other)
+		if not Arena.queue_strike(self, other):
+			_resolve(other)
 		return
 
 
 func _resolve(other: Fighter) -> void:
+	if not is_instance_valid(other) or not other._can_receive_strike():
+		return
 	var dir := signf(other.global_position.x - global_position.x)
 	if dir == 0.0:
 		dir = facing
-	var headshot := _strike_overlaps_head(other)
-
+	var authored_box: Vector2 = _move.get("box", Vector2(0, -50))
+	# Un coup de corps qui croise la tete d'un adversaire accroupi reste un
+	# coup de corps. Seules les frappes réellement placees en hauteur gagnent
+	# le bonus de tete.
+	var headshot := _strike_overlaps_head(other) and authored_box.y <= -70.0
+	var attack_kind := "kick" if _is_kick() else "punch"
 	if other.state == State.BLOCK and other.facing != dir:
 		# ---- GARDE > FRAPPE ----
 		other.on_blocked(float(_move["dmg"]), float(_move["blockstun"]))
@@ -831,17 +865,32 @@ func _resolve(other: Fighter) -> void:
 		_phase = 2
 		_t = float(_move["recover"])
 		rumble(0.75, 0.45, 0.22)
-		Arena.impact(_hitbox_world_point(),
-			Vector2(-dir, -0.35), Color(0.62, 0.88, 1.0), 0.55)
+		var block_at := _hitbox_world_point()
+		Arena.impact(block_at,
+			Vector2(-dir, -0.35), Color(0.62, 0.88, 1.0), 0.55, "block")
+		Arena.combat_text(block_at + Vector2(0, -18), "GARDE",
+			Color(0.68, 0.90, 1.0), 0.88)
 		Arena.shake(3.0)
 		Arena.hitstop(int(clampf(16.0 + float(_move["dmg"]) * 1.5, 20.0, 48.0)))
 	elif other.state in [State.GRAB, State.GRABBING]:
 		# ---- FRAPPE > GRAB ----
-		other.on_hit(_move, dir, GRAB_PUNISH, _hitbox_world_point(), headshot)
+		other.on_hit(_move, dir, GRAB_PUNISH, _hitbox_world_point(), headshot,
+			attack_kind, move_name)
 		_finish_hit()
 	else:
-		other.on_hit(_move, dir, 0.0, _hitbox_world_point(), headshot)
+		other.on_hit(_move, dir, 0.0, _hitbox_world_point(), headshot,
+			attack_kind, move_name)
 		_finish_hit()
+
+
+func _on_clash() -> void:
+	if state != State.ATTACK:
+		return
+	hitbox.monitoring = false
+	_hit_done = true
+	_phase = 2
+	_t = float(_move.get("recover", 0.2))
+	rumble(0.28, 0.42, 0.12)
 
 
 func _strike_overlaps_head(other: Fighter) -> bool:
@@ -897,6 +946,7 @@ func _end_action() -> void:
 #  Grab
 # ------------------------------------------------------------
 func _start_grab() -> void:
+	_wakeup_safe_t = 0.0
 	state = State.GRAB
 	hitbox.collision_mask = _throw_hurt_mask()
 	_phase = 0
@@ -937,7 +987,11 @@ func _poll_grab() -> void:
 		var other = a.get_parent()
 		if other == self or not (other is Fighter):
 			continue
-		if other.state in [State.GRABBED, State.KO]:
+		if not (other as Fighter)._can_be_grabbed():
+			continue
+		# Une frappe en preparation ou active bat une saisie, quel que soit
+		# l'ordre dans lequel les deux combattants sont traites cette frame.
+		if other.state == State.ATTACK and other._phase <= 1:
 			continue
 		hitbox.monitoring = false
 		# ---- GRAB > GARDE ----
@@ -1053,7 +1107,12 @@ func _throw() -> void:
 			v.global_position = global_position + Vector2(-38.0 * facing, -34.0)
 		elif thrown_dir == "down":
 			v.global_position.y -= 24.0
-		v.take_damage(THROW_DAMAGE * float(t["dmg"]), kb, float(t["stun"]))
+		var throw_damage := THROW_DAMAGE * float(t["dmg"])
+		v.take_damage(throw_damage, kb, float(t["stun"]))
+		if v.state != State.KO:
+			v._knockdown = true
+			v._knockdown_landed = false
+			v._getup_t = 0.0
 		var power: float = 1.9 if thrown_dir in ["down", "back"] else 1.5
 		var impact_pos := v.global_position + Vector2(0, -46)
 		if thrown_dir == "down":
@@ -1061,7 +1120,9 @@ func _throw() -> void:
 		elif thrown_dir == "up":
 			impact_pos = global_position + Vector2(28.0 * facing, -82.0)
 		Arena.impact(impact_pos, kb.normalized(),
-			Color(1.0, 0.85, 0.4), power)
+			Color(1.0, 0.85, 0.4), power, "throw")
+		Arena.combat_text(impact_pos + Vector2(0, -18),
+			"PROJECTION  -%d" % roundi(throw_damage), Color(1.0, 0.87, 0.48), 1.06)
 		Arena.shake(15.0 if thrown_dir in ["down", "back"] else 10.0)
 		Arena.hitstop(140 if thrown_dir in ["down", "back"] else 105)
 		SFX.play2d(sfx, "throw", -3.0)
@@ -1113,16 +1174,97 @@ func _tick_grabbed(delta: float) -> void:
 
 func _tick_hurt(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, 0.0, 700.0 * delta)
+	if _knockdown:
+		# `is_on_floor()` decrit le dernier move_and_slide. Juste apres un
+		# impact ascendant il vaut encore vrai pendant une frame : la vitesse
+		# verticale doit donc aussi etre regardee, sinon un uppercut mettrait
+		# directement la victime a plat sans la lancer.
+		if velocity.y < -1.0 or not is_on_floor():
+			_spin += delta * clampf(velocity.x / 150.0, -6.0, 6.0)
+			_t -= delta
+			return
+		_enter_down()
+		return
 	if not is_on_floor():
 		_spin += delta * clampf(velocity.x / 150.0, -6.0, 6.0)
 	else:
 		_spin = move_toward(_spin, 0.0, delta * 7.0)
 	_t -= delta
 	if _t <= 0.0 and is_on_floor():
-		state = State.IDLE
-		_still = 0.0
+		_finish_standing_recovery()
+
+
+func _enter_down() -> void:
+	state = State.DOWN
+	_knockdown_landed = true
+	_t = KNOCKDOWN_HOLD
+	_spin = -1.28 * facing
+	velocity.x = move_toward(velocity.x, 0.0, 220.0)
+	hitbox.monitoring = false
+
+
+func _tick_down(delta: float) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, 1000.0 * delta)
+	_spin = lerp_angle(_spin, -1.28 * facing, minf(1.0, 14.0 * delta))
+	_t -= delta
+	if _t <= 0.0:
+		state = State.GETUP
+		_getup_t = 0.0
+
+
+func _tick_getup(delta: float) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, 1200.0 * delta)
+	_getup_t += delta
+	var q := clampf(_getup_t / GETUP_TIME, 0.0, 1.0)
+	_spin = lerp_angle(-1.28 * facing, 0.0, smoothstep(0.0, 1.0, q))
+	if q >= 1.0:
+		_knockdown = false
+		_knockdown_landed = false
+		_getup_t = 0.0
 		_spin = 0.0
-		block_energy = maxf(block_energy, 0.2)
+		_wakeup_safe_t = WAKEUP_SAFETY
+		_guard_broken = false
+		_reset_combo()
+		block_energy = maxf(block_energy, 0.25)
+		_buf_t = maxf(_buf_t, BUFFER_TIME if _buf != "" else 0.0)
+		# Sans ordre en attente ni direction tenue, la garde revient tout de
+		# suite. Sinon le dernier bouton saisi pendant la chute part au prochain
+		# tick jouable.
+		if _buf == "" and not _held_dir() and AttackLibrary.has_custom_guard():
+			state = State.BLOCK
+		else:
+			state = State.IDLE
+		_still = 0.0
+
+
+func _finish_standing_recovery() -> void:
+	var protected_recovery := _guard_broken
+	_guard_broken = false
+	_reset_combo()
+	state = State.IDLE
+	_still = 0.0
+	_spin = 0.0
+	block_energy = maxf(block_energy, 0.2)
+	if protected_recovery:
+		_wakeup_safe_t = WAKEUP_SAFETY
+		if _buf == "" and not _held_dir() and AttackLibrary.has_custom_guard():
+			state = State.BLOCK
+
+
+func _reset_combo() -> void:
+	_combo_hits = 0
+	_combo_last_move = ""
+	_same_move_hits = 0
+
+
+func _can_receive_strike() -> bool:
+	return _wakeup_safe_t <= 0.0 and state not in [State.DOWN, State.GETUP,
+		State.KO, State.GRABBED]
+
+
+func _can_be_grabbed() -> bool:
+	return _wakeup_safe_t <= 0.0 and state not in [State.AIR, State.HURT,
+		State.DOWN, State.GETUP, State.KO, State.GRABBED, State.GRABBING]
 
 
 # ------------------------------------------------------------
@@ -1134,7 +1276,9 @@ func on_blocked(dmg: float, stun := 0.16) -> void:
 	state = State.BLOCK
 	_block_stun = maxf(_block_stun, stun)
 	hp_changed.emit()
-	velocity.x = -facing * (BLOCK_PUSH_BASE + dmg * BLOCK_PUSH_PER_DMG)
+	# Bloquer absorbe le coup sur place : l'attaquant reste assez proche pour
+	# qu'une punition soit possible a la sortie de garde.
+	velocity.x = 0.0
 	rumble(0.35, 0.10, 0.12)
 	SFX.play2d(sfx, "block", -8.0)
 	if hp <= 0.0:
@@ -1142,9 +1286,22 @@ func on_blocked(dmg: float, stun := 0.16) -> void:
 
 
 func on_hit(mv: Dictionary, dir: float, extra_stun: float,
-		impact_at := Vector2.INF, headshot := false) -> void:
+		impact_at := Vector2.INF, headshot := false, impact_kind := "punch",
+		attack_name := "") -> void:
+	if not _can_receive_strike():
+		return
+	var continues_combo := state == State.HURT and _combo_hits > 0
+	_combo_hits = _combo_hits + 1 if continues_combo else 1
+	if attack_name != "" and attack_name == _combo_last_move:
+		_same_move_hits += 1
+	else:
+		_combo_last_move = attack_name
+		_same_move_hits = 1
+	var combo_scale: float = [1.0, 0.85, 0.70, 0.60][mini(_combo_hits - 1, 3)]
+	var stun_scale := maxf(0.65, 1.0 - float(_combo_hits - 1) * 0.10)
 	var kb: Vector2 = mv["kb"]
-	var dmg: float = float(mv["dmg"]) * (HEAD_DAMAGE_MULTIPLIER if headshot else 1.0)
+	var dmg: float = float(mv["dmg"]) * (HEAD_DAMAGE_MULTIPLIER if headshot else 1.0) \
+		* combo_scale
 	var box: Vector2 = mv.get("box", Vector2(0, -50))
 	if kb.y < -360.0:
 		_hurt_pose_name = "hurt_launch"
@@ -1154,12 +1311,25 @@ func on_hit(mv: Dictionary, dir: float, extra_stun: float,
 		_hurt_pose_name = "hurt_low"
 	else:
 		_hurt_pose_name = "hurt_body"
-	take_damage(dmg, Vector2(kb.x * dir, kb.y), float(mv["hitstun"]) + extra_stun)
+	var causes_knockdown := kb.y <= -300.0 or float(mv["dmg"]) >= 18.0 \
+		or box.y >= -24.0 or _same_move_hits >= 3 or _combo_hits >= 4 \
+		or _guard_broken
+	take_damage(dmg, Vector2(kb.x * dir, kb.y),
+		(float(mv["hitstun"]) + extra_stun) * stun_scale)
+	if state != State.KO and causes_knockdown:
+		_knockdown = true
+		_knockdown_landed = false
+		_getup_t = 0.0
 	var at: Vector2 = impact_at
 	if not at.is_finite():
 		at = global_position + Vector2(kb.x * dir, kb.y).normalized() * 14.0 + Vector2(0, -50)
-	var impact_color := Color(1.0, 0.48, 0.24) if headshot else Color(1.0, 0.78, 0.38)
-	Arena.impact(at, Vector2(kb.x * dir, kb.y), impact_color, dmg / 9.0)
+	var impact_color := Color(1.0, 0.42, 0.22) if headshot else (
+		Color(0.46, 0.80, 1.0) if impact_kind == "kick" else Color(1.0, 0.78, 0.38))
+	Arena.impact(at, Vector2(kb.x * dir, kb.y), impact_color, dmg / 9.0, impact_kind)
+	var damage_label := "-%d" % roundi(dmg)
+	if headshot:
+		damage_label = "TETE  " + damage_label
+	Arena.combat_text(at + Vector2(0, -18), damage_label, impact_color, 0.96)
 	Arena.shake(2.0 + dmg * 0.45)
 	Arena.hitstop(int(clampf(24.0 + dmg * 2.6, 24.0, 105.0)))
 	var impact_sound := "hit_head" if headshot else (
@@ -1188,6 +1358,9 @@ func _enter_hurt(stun: float, kb: Vector2) -> void:
 	hitbox.monitoring = false
 	_set_crouch(false)
 	state = State.HURT
+	_knockdown = false
+	_knockdown_landed = false
+	_getup_t = 0.0
 	_t = stun
 	velocity = kb
 	_external_clip_info = {}
@@ -1202,11 +1375,18 @@ func _die() -> void:
 	hitbox.monitoring = false
 	_set_crouch(false)
 	state = State.KO
+	_knockdown = false
+	_knockdown_landed = false
+	_getup_t = 0.0
+	_wakeup_safe_t = 0.0
+	_guard_broken = false
+	_reset_combo()
 	_external_clip_info = {}
 	_root_motion_last = 0.0
 	move_name = ""
 	Arena.shake(16.0)
 	Arena.hitstop(180)
+	Arena.finish_flash()
 	SFX.play2d(sfx, "ko", -2.0)
 	ko.emit()
 
@@ -1225,6 +1405,12 @@ func reset_round() -> void:
 	_grab_victim = null
 	_throw_pending = false
 	_spin = 0.0
+	_knockdown = false
+	_knockdown_landed = false
+	_getup_t = 0.0
+	_wakeup_safe_t = 0.0
+	_guard_broken = false
+	_reset_combo()
 	_turn_y = 0.0
 	_body_twist = Vector2.ZERO
 	_hook_arc = 0.0
@@ -1403,6 +1589,8 @@ func _animate(delta: float) -> void:
 	match state:
 		State.KO:      _pose_target = "ko"
 		State.HURT:    _pose_target = _hurt_pose_name
+		State.DOWN:    _pose_target = _hurt_pose_name
+		State.GETUP:   _pose_target = _hurt_pose_name
 		State.BLOCK:   _pose_target = "block"
 		State.CROUCH:  _pose_target = "crouch"
 		State.AIR:     _pose_target = "air"

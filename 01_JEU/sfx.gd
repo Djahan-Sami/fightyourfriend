@@ -59,6 +59,7 @@ static func _stream_for(name: String) -> AudioStreamWAV:
 		"guard_break": s = _impact(58.0, 0.32, 1.0, 0.85)
 		"grab":        s = _impact(125.0, 0.13, 0.70, 0.15)
 		"throw":       s = _impact(55.0, 0.28, 1.0, 0.62)
+		"countdown":   s = _ring(720.0, 0.09, 0.42)
 		"fight":       s = _two_tone(410.0, 820.0, 0.18, 0.52)
 		"victory":     s = _chime([523.25, 659.25, 783.99, 1046.50], 0.15, 0.52)
 		"ko":          s = _sweep(310.0, 48.0, 0.62, 0.95, true)

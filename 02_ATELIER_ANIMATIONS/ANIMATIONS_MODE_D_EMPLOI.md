@@ -1,4 +1,4 @@
-# Atelier d'animation Ragdoll Brawl
+# Atelier d'animation Fight Your Friend
 
 L'atelier repart d'une base vide :
 
@@ -20,7 +20,7 @@ Les fichiers exportés ne contiennent ni personnage ni modèle visible : uniquem
 ## Ouvrir l'atelier
 
 1. Double-cliquez sur `ANIMER_LES_COUPS.bat`.
-2. Dans Blender, ouvrez le panneau **Ragdoll Brawl** à droite. Appuyez sur `N` s'il est masqué.
+2. Dans Blender, ouvrez le panneau **Fight Your Friend** à droite. Appuyez sur `N` s'il est masqué.
 3. L'écran d'accueil sépare la position vulnérable, la garde et les coups.
 
 ## Créer la position vulnérable

@@ -1,4 +1,4 @@
-"""Atelier Blender minimal de Ragdoll Brawl.
+"""Atelier Blender minimal de Fight Your Friend.
 
 Principes :
 - la garde et les coups sont deux actions totalement separees ;
@@ -8,11 +8,11 @@ Principes :
 """
 
 bl_info = {
-    "name": "Ragdoll Brawl - Atelier simple",
-    "author": "Ragdoll Brawl",
+    "name": "Fight Your Friend - Atelier simple",
+    "author": "Fight Your Friend contributors",
     "version": (2, 0, 0),
     "blender": (5, 0, 0),
-    "location": "Vue 3D > panneau Ragdoll Brawl",
+    "location": "Vue 3D > panneau Fight Your Friend",
     "category": "Animation",
 }
 
@@ -197,10 +197,16 @@ def create_skeleton_carrier(armature):
 
 
 def output_dir():
-    appdata = os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming"))
-    directory = Path(appdata) / "Godot" / "app_userdata" / "Ragdoll Brawl" / "attacks"
+    # Le script se trouve dans 02_ATELIER_ANIMATIONS. Les exports sont places
+    # directement dans le projet Godot : ils sont donc sauvegardes avec le jeu
+    # et apparaissent naturellement dans Git/GitHub.
+    directory = Path(__file__).resolve().parent.parent / "01_JEU" / "default_attacks"
     directory.mkdir(parents=True, exist_ok=True)
     return directory
+
+
+def animation_reference(file_name):
+    return f"res://default_attacks/{file_name}"
 
 
 def save_blend():
@@ -1104,7 +1110,7 @@ class RB2_OT_ExportNeutral(bpy.types.Operator):
         data = manifest_data()
         data["version"] = 3
         data["neutral"] = {
-            "animation_file": "user://attacks/neutral.glb",
+            "animation_file": animation_reference("neutral.glb"),
             "animation": "NEUTRE",
             "support": "both",
             "source_forward": SOURCE_FORWARD,
@@ -1199,7 +1205,7 @@ class RB2_OT_ExportGuard(bpy.types.Operator):
         data = manifest_data()
         data["version"] = 3
         data["guard"] = {
-            "animation_file": "user://attacks/guard.glb",
+            "animation_file": animation_reference("guard.glb"),
             "animation": "GARDE",
             "support": "both",
             "source_forward": SOURCE_FORWARD,
@@ -1277,7 +1283,7 @@ class RB2_OT_ExportCrouch(bpy.types.Operator):
         data = manifest_data()
         data["version"] = 3
         data["crouch"] = {
-            "animation_file": "user://attacks/crouch.glb",
+            "animation_file": animation_reference("crouch.glb"),
             "animation": "ACCROUPI",
             "support": "both",
             "source_forward": SOURCE_FORWARD,
@@ -1496,7 +1502,7 @@ class RB2_OT_ExportMove(bpy.types.Operator):
         data["slots"][MOVE_SLOTS[move]] = move
         defaults = DEFAULTS.get(move, (6, 4, 10, 8))
         move_data = {
-            "animation_file": f"user://attacks/{move}.glb",
+            "animation_file": animation_reference(f"{move}.glb"),
             "animation": move,
             "startup": context.scene.rb2_startup / 60.0,
             "active": context.scene.rb2_active / 60.0,
@@ -1560,11 +1566,11 @@ def draw_controls(layout):
 
 
 class RB2_PT_Panel(bpy.types.Panel):
-    bl_label = "Ragdoll Brawl"
+    bl_label = "Fight Your Friend"
     bl_idname = "RB2_PT_panel"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Ragdoll Brawl"
+    bl_category = "Fight Your Friend"
 
     def draw(self, context):
         layout = self.layout

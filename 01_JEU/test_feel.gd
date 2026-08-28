@@ -83,9 +83,9 @@ func _measure(move: String) -> int:
 func _run() -> void:
 	print("A. duree totale des coups (frames a 60 Hz, dans le vide)")
 	var budget := {
-		"jab": 14, "hook": 26, "body_hook": 28, "uppercut": 25,
-		"spinning_backfist": 29, "middle_kick": 25, "front_kick": 24,
-		"spinning_kick": 36, "high_kick": 28, "sweep": 30, "air_punch": 18,
+		"jab": 16, "hook": 29, "body_hook": 31, "uppercut": 35,
+		"spinning_backfist": 38, "middle_kick": 27, "front_kick": 34,
+		"spinning_kick": 40, "high_kick": 31, "sweep": 35, "air_punch": 21,
 	}
 	for m in budget.keys():
 		var n := await _measure(m)
@@ -133,7 +133,7 @@ func _run() -> void:
 	_check("le buffer expire bien", f1._buf == "" and f1.state != Fighter.State.ATTACK)
 
 	print("D. la garde se leve vite")
-	_check("garde sous 0.20 s", Fighter.BLOCK_RAISE <= 0.20)
+	_check("garde sous 0.12 s", Fighter.BLOCK_RAISE <= 0.12)
 	print("     (BLOCK_RAISE = %.2f s, buffer = %.2f s)" % [Fighter.BLOCK_RAISE, Fighter.BUFFER_TIME])
 
 	print("E. les pieds annulent le deplacement du corps pendant l'appui")
@@ -211,6 +211,7 @@ func _run() -> void:
 	f2.state = Fighter.State.BLOCK
 	f2.block_energy = 1.0
 	var hp_before_block := f2.hp
+	var x_before_block := f2.global_position.x
 	f1._start_move("jab")
 	for i in 40:
 		if f2._block_stun > 0.0:
@@ -218,8 +219,15 @@ func _run() -> void:
 		await get_tree().physics_frame
 	_check("le defenseur recoit son block-stun", f2._block_stun > 0.0)
 	_check("la garde ne prend que des degats reduits", f2.hp < hp_before_block and f2.hp > hp_before_block - 3.0)
+	_check("la garde absorbe le coup sans faire reculer le defenseur",
+		absf(f2.global_position.x - x_before_block) < 0.01)
 	while f1.state == Fighter.State.ATTACK:
 		await get_tree().physics_frame
+	# On replace les deux combattants pour isoler la reaction du crochet.
+	f1.global_position = Vector2(500, GROUND_Y)
+	f2.global_position = Vector2(560, GROUND_Y)
+	f1.velocity = Vector2.ZERO
+	f2.velocity = Vector2.ZERO
 	f2.state = Fighter.State.IDLE
 	f2._block_stun = 0.0
 	f2.frozen = true

@@ -1,36 +1,60 @@
-# Ragdoll Brawl
+# Fight Your Friend
 
-Prototype de jeu de combat 3D réalisé avec Godot. Les attaques, les poses et
-leurs réglages peuvent être modifiés dans l'atelier Blender fourni avec le jeu.
+Jeu de combat 3D local pour deux joueurs, realise avec Godot. Les animations,
+les hitbox, les degats et les timings peuvent etre modifies avec les ateliers
+fournis dans le projet.
 
 ## Lancer le jeu
 
 1. Installe [Godot 4.7.2](https://godotengine.org/download/windows/).
 2. Double-clique sur `LANCER_LE_JEU.bat`.
-3. Si Godot n'est pas détecté, copie `CONFIG_LOCAL.bat.example` sous le nom
-   `CONFIG_LOCAL.bat`, puis indique le chemin de Godot dedans.
+3. Si Godot n'est pas detecte, copie `CONFIG_LOCAL.bat.example` sous le nom
+   `CONFIG_LOCAL.bat`, puis renseigne le chemin de Godot.
 
-Blender est facultatif pour jouer. Pour modifier les animations, installe
-Blender 5.2, renseigne également son chemin dans `CONFIG_LOCAL.bat`, puis ouvre
+Blender est facultatif pour jouer. Pour creer ou modifier les animations,
+installe Blender 5.2, renseigne son chemin dans `CONFIG_LOCAL.bat`, puis lance
 `ANIMER_LES_COUPS.bat`.
+
+## Animations et sauvegardes
+
+Blender exporte directement les animations dans `01_JEU/default_attacks`.
+Ce dossier contient les fichiers GLB ainsi que `attack_manifest.json` : les
+animations et les reglages sont donc inclus dans les commits Git et sur GitHub.
+
+Dans l'atelier du jeu, le bouton **SAUVEGARDER TOUT** cree aussi une copie datee
+dans `05_SAUVEGARDES`. Ce dossier reste local et n'est pas envoye sur GitHub.
+Le bouton **RESTAURER LA DERNIERE COPIE** permet de revenir a cette sauvegarde.
 
 ## Contenu du projet
 
-- `01_JEU` : projet Godot et animations de combat de base.
+- `01_JEU` : projet Godot, code et animations publiees.
 - `02_ATELIER_ANIMATIONS` : atelier Blender et outils d'export.
-- `03_SKINS_PERSONNAGES` : emplacement des modèles `.glb` ou `.gltf`.
-- `04_SKINS_TERRAINS` : arrière-plans et revêtements de sol des arènes.
-- `05_SAUVEGARDES` : sauvegardes locales, exclues de GitHub.
+- `03_SKINS_PERSONNAGES` : modeles `.glb` ou `.gltf` personnels.
+- `04_SKINS_TERRAINS` : images de fond et revetements de sol des arenes.
+- `05_SAUVEGARDES` : copies locales des animations, exclues de GitHub.
 
-Une nouvelle installation copie automatiquement les animations fournies vers
-les données locales du jeu. Des modifications déjà présentes sur l'ordinateur
-ne sont jamais remplacées.
+Pour ajouter un terrain, place une image `Nom.png` dans `04_SKINS_TERRAINS`.
+Ajoute facultativement `Nom_sol.png` pour que le sol utilise un revetement
+associe. Les formats PNG, JPG, JPEG et WebP sont acceptes.
 
-## Exemples inclus
+Les skins personnels de personnages ne sont pas inclus dans le depot public.
+Une arene d'exemple est fournie. Les credits des ressources tierces se trouvent
+dans `01_JEU/THIRD_PARTY.md`.
 
-- Une arène de toit composée d'une image de fond et de son revêtement de sol.
+## Creer la version Windows
 
-Aucun skin de personnage n'est inclus. Les modèles, photographies, essais de
-génération 3D et sauvegardes privées ne font pas partie du dépôt. Voir
-`01_JEU/THIRD_PARTY.md` pour les crédits des ressources tierces incluses ou
-étudiées.
+1. Dans Godot, installe une fois les modeles d'exportation correspondant a la
+   version 4.7.2. Cette installation ne demande pas les droits administrateur.
+2. Double-clique sur `EXPORTER_WINDOWS.bat`.
+3. La version jouable est creee dans le dossier `build`.
+
+## Tests
+
+Les tests automatiques sont executes a chaque envoi et chaque pull request sur
+GitHub. Ils couvrent notamment les animations externes, les saisies, la garde,
+les chutes, les combos, les echanges simultanes et le chargement du combat.
+
+## Licence
+
+Le code du projet est distribue sous licence MIT. Les ressources tierces gardent
+leurs licences propres, detaillees dans `01_JEU/THIRD_PARTY.md`.

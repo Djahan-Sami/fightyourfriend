@@ -70,6 +70,7 @@ var _saved_camera_position := Vector3.ZERO
 var _saved_camera_v_offset := 0.0
 var _camera_was_saved := false
 var return_to_menu_on_close := false
+var backup_restore_dialog: ConfirmationDialog
 
 
 func setup(owner_arena: Arena) -> void:
@@ -93,6 +94,24 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _build_ui() -> void:
+	# L'ancien ecran d'import et d'affectation n'est plus construit. Blender
+	# exporte directement les animations dans le projet ; l'atelier du jeu ne
+	# montre donc que le coup selectionne et ses reglages utiles.
+	for move_name in Fighter.MOVES.keys():
+		_moves.append(str(move_name))
+	_moves.sort_custom(func(a: String, b: String):
+		return str(MOVE_LABELS.get(a, a)) < str(MOVE_LABELS.get(b, b)))
+	_build_hitbox_ui()
+	root = visual_root
+	for index in _moves.size():
+		if AttackLibrary.has_custom_move(_moves[index]):
+			visual_move_select.select(index)
+			break
+
+
+# Conserve temporairement le code de l'ancienne interface pour la lecture des
+# anciens projets, mais il n'est plus instancie ni affiche dans le jeu.
+func _build_old_ui_legacy() -> void:
 	root = Control.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
@@ -738,6 +757,24 @@ func _build_hitbox_ui() -> void:
 	visual_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	visual_status.add_theme_color_override("font_color", Color(0.58, 1.0, 0.72))
 	column.add_child(visual_status)
+	var backup_row := HBoxContainer.new()
+	backup_row.add_theme_constant_override("separation", 8)
+	column.add_child(backup_row)
+	var backup_button := _styled_button("SAUVEGARDER TOUT", "success")
+	backup_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	backup_button.pressed.connect(_backup_all_animations)
+	backup_row.add_child(backup_button)
+	var restore_button := _styled_button("RESTAURER LA DERNIERE COPIE", "secondary")
+	restore_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	restore_button.pressed.connect(_ask_restore_backup)
+	backup_row.add_child(restore_button)
+	backup_restore_dialog = ConfirmationDialog.new()
+	backup_restore_dialog.title = "Restaurer les animations"
+	backup_restore_dialog.dialog_text = "La derniere copie remplacera les animations et reglages actuels."
+	backup_restore_dialog.ok_button_text = "RESTAURER"
+	backup_restore_dialog.cancel_button_text = "ANNULER"
+	backup_restore_dialog.confirmed.connect(_restore_latest_backup)
+	visual_root.add_child(backup_restore_dialog)
 	var close := _styled_button("FERMER L'ATELIER", "secondary")
 	close.custom_minimum_size.y = 36
 	close.pressed.connect(hide_workshop)
@@ -902,8 +939,6 @@ func toggle() -> void:
 
 func show_workshop() -> void:
 	AttackLibrary.reload()
-	_load_selected()
-	root.visible = false
 	visual_root.visible = true
 	get_tree().paused = true
 	visual_status.text = ""
@@ -950,9 +985,8 @@ func _process(delta: float) -> void:
 func _show_hitbox_editor() -> void:
 	var move_name := _selected_move()
 	if AttackLibrary.clip_info(move_name).is_empty():
-		status_label.text = "Exporte d'abord l'animation de ce coup."
+		visual_status.text = "Exporte d'abord l'animation de ce coup."
 		return
-	root.visible = false
 	visual_root.visible = true
 	visual_status.text = ""
 	visual_move_select.select(maxi(0, _moves.find(move_name)))
@@ -966,8 +1000,6 @@ func _hide_hitbox_editor() -> void:
 func _visual_move_changed(index: int) -> void:
 	if index < 0 or index >= _moves.size():
 		return
-	move_select.select(index)
-	_load_selected()
 	var move_name := _moves[index]
 	if AttackLibrary.clip_info(move_name).is_empty():
 		visual_status.text = "Ce coup n'a pas encore ete exporte."
@@ -1617,9 +1649,9 @@ func _rotate_hitbox(amount: float) -> void:
 
 
 func _selected_move() -> String:
-	if move_select == null or _moves.is_empty():
+	if visual_move_select == null or _moves.is_empty():
 		return ""
-	return _moves[clampi(move_select.selected, 0, _moves.size() - 1)]
+	return _moves[clampi(visual_move_select.selected, 0, _moves.size() - 1)]
 
 
 func _load_selected() -> void:
@@ -1735,5 +1767,33 @@ func _select_metadata(option: OptionButton, value: String) -> void:
 
 
 func _open_folder() -> void:
-	DirAccess.make_dir_recursive_absolute(AttackLibrary.DIR)
-	OS.shell_open(ProjectSettings.globalize_path(AttackLibrary.DIR))
+	OS.shell_open(AttackLibrary.storage_absolute_path())
+
+
+func _backup_all_animations() -> void:
+	var path := AttackLibrary.create_backup()
+	if path == "":
+		visual_status.text = "La sauvegarde n'a pas pu etre creee."
+	else:
+		visual_status.text = "Copie creee : %s" % path.get_file()
+
+
+func _ask_restore_backup() -> void:
+	var latest := AttackLibrary.latest_backup()
+	if latest == "":
+		visual_status.text = "Aucune copie d'animations n'a ete trouvee."
+		return
+	backup_restore_dialog.dialog_text = \
+		"Restaurer %s ?\nLes reglages actuels seront remplaces." % latest.get_file()
+	backup_restore_dialog.popup_centered(Vector2i(520, 190))
+
+
+func _restore_latest_backup() -> void:
+	var restored := AttackLibrary.restore_latest_backup()
+	if restored == "":
+		visual_status.text = "La restauration a echoue."
+		return
+	var move_name := _selected_move()
+	visual_status.text = "Copie restauree : %s" % restored.get_file()
+	if not AttackLibrary.clip_info(move_name).is_empty():
+		_spawn_hitbox_preview(move_name)

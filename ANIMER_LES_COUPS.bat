@@ -16,5 +16,5 @@ pause
 exit /b 1
 
 :launch
-start "Ragdoll Brawl - Atelier" "%BLENDER%" "%STUDIO%" --python "%TOOLS%"
+start "Fight Your Friend - Atelier" "%BLENDER%" "%STUDIO%" --python "%TOOLS%"
 endlocal

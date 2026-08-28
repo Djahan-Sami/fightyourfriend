@@ -14,5 +14,5 @@ pause
 exit /b 1
 
 :launch
-start "Ragdoll Brawl" "%GODOT%" --path "%~dp001_JEU"
+start "Fight Your Friend" "%GODOT%" --path "%~dp001_JEU"
 endlocal

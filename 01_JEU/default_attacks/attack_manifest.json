@@ -1,14 +1,15 @@
 {
+  "balance_version": 2,
   "crouch": {
     "animation": "ACCROUPI",
-    "animation_file": "user://attacks/crouch.glb",
+    "animation_file": "res://default_attacks/crouch.glb",
     "rig_id": "ragdoll_brawl_humanoid_v1",
     "source_forward": -1.0,
     "support": "both"
   },
   "guard": {
     "animation": "GARDE",
-    "animation_file": "user://attacks/guard.glb",
+    "animation_file": "res://default_attacks/guard.glb",
     "rig_id": "ragdoll_brawl_humanoid_v1",
     "source_forward": -1.0,
     "support": "both"
@@ -33,7 +34,7 @@
     "air_backfist": {
       "active": 0.0666666666666667,
       "animation": "air_backfist",
-      "animation_file": "user://attacks/air_backfist.glb",
+      "animation_file": "res://default_attacks/air_backfist.glb",
       "box": [
         37.403564453125,
         -116.111572265625
@@ -54,7 +55,7 @@
     "air_cross": {
       "active": 0.266666666666667,
       "animation": "air_cross",
-      "animation_file": "user://attacks/air_cross.glb",
+      "animation_file": "res://default_attacks/air_cross.glb",
       "box": [
         63.9932861328125,
         -29.5701599121094
@@ -66,21 +67,21 @@
       "radius": 21.0,
       "radius_x": 21.0,
       "radius_y": 10.0,
-      "recover": 0.15,
+      "recover": 0.2,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.133333333333333,
+      "startup": 0.1667,
       "support": "none"
     },
     "air_hammer": {
       "active": 0.0666666666666667,
       "animation": "air_hammer",
-      "animation_file": "user://attacks/air_hammer.glb",
+      "animation_file": "res://default_attacks/air_hammer.glb",
       "box": [
         42.3020629882813,
         -104.684722900391
       ],
-      "dmg": 12.0,
+      "dmg": 14.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "circle",
@@ -96,7 +97,7 @@
     "air_kick": {
       "active": 0.0666666666666667,
       "animation": "air_kick",
-      "animation_file": "user://attacks/air_kick.glb",
+      "animation_file": "res://default_attacks/air_kick.glb",
       "box": [
         46.9066162109375,
         -69.6211853027344
@@ -117,7 +118,7 @@
     "air_punch": {
       "active": 0.0666666666666667,
       "animation": "air_punch",
-      "animation_file": "user://attacks/air_punch.glb",
+      "animation_file": "res://default_attacks/air_punch.glb",
       "box": [
         26.9329223632813,
         -93.2237548828125
@@ -138,12 +139,12 @@
     "air_rising_kick": {
       "active": 0.1,
       "animation": "air_rising_kick",
-      "animation_file": "user://attacks/air_rising_kick.glb",
+      "animation_file": "res://default_attacks/air_rising_kick.glb",
       "box": [
         55.8869018554688,
         -64.4206848144531
       ],
-      "dmg": 13.0,
+      "dmg": 15.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "ellipse",
@@ -153,34 +154,35 @@
       "recover": 0.21666666666666667,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.333333333333333,
+      "startup": 0.2833,
       "support": "none"
     },
     "air_roundhouse": {
       "active": 0.0666666666666667,
       "animation": "air_roundhouse",
-      "animation_file": "user://attacks/air_roundhouse.glb",
+      "animation_file": "res://default_attacks/air_roundhouse.glb",
       "box": [
         80.0,
         -69.6940307617188
       ],
-      "dmg": 13.0,
+      "dmg": 12.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "ellipse",
+      "hitstun": 0.3167,
       "radius": 30.0,
       "radius_x": 30.0,
       "radius_y": 13.0,
       "recover": 0.23333333333333334,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.1,
+      "startup": 0.15,
       "support": "none"
     },
     "air_side_kick": {
       "active": 0.333333333333333,
       "animation": "air_side_kick",
-      "animation_file": "user://attacks/air_side_kick.glb",
+      "animation_file": "res://default_attacks/air_side_kick.glb",
       "box": [
         63.1434936523438,
         -55.737548828125
@@ -197,16 +199,16 @@
       "radius": 30.0,
       "radius_x": 30.0,
       "radius_y": 9.0,
-      "recover": 0.18333333333333332,
+      "recover": 0.2333,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.133333333333333,
+      "startup": 0.1833,
       "support": "none"
     },
     "air_upper": {
       "active": 0.0666666666666667,
       "animation": "air_upper",
-      "animation_file": "user://attacks/air_upper.glb",
+      "animation_file": "res://default_attacks/air_upper.glb",
       "box": [
         40.574462890625,
         -101.822723388672
@@ -227,7 +229,7 @@
     "body_hook": {
       "active": 0.133333333333333,
       "animation": "body_hook",
-      "animation_file": "user://attacks/body_hook.glb",
+      "animation_file": "res://default_attacks/body_hook.glb",
       "box": [
         53.4201049804688,
         -64.39453125
@@ -248,12 +250,12 @@
     "dive_kick": {
       "active": 0.1,
       "animation": "dive_kick",
-      "animation_file": "user://attacks/dive_kick.glb",
+      "animation_file": "res://default_attacks/dive_kick.glb",
       "box": [
         -3.6715087890625,
         -84.0303039550781
       ],
-      "dmg": 12.0,
+      "dmg": 15.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "circle",
@@ -287,19 +289,19 @@
     "front_kick": {
       "active": 0.1,
       "animation": "front_kick",
-      "animation_file": "user://attacks/front_kick.glb",
+      "animation_file": "res://default_attacks/front_kick.glb",
       "box": [
         27.94677734375,
         -62.764892578125
       ],
-      "dmg": 12.0,
+      "dmg": 18.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "ellipse",
       "radius": 40.0,
       "radius_x": 40.0,
       "radius_y": 18.0,
-      "recover": 0.2,
+      "recover": 0.25,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "root_motion_curve": [
         [
@@ -326,28 +328,29 @@
     "high_kick": {
       "active": 0.0666666666666667,
       "animation": "high_kick",
-      "animation_file": "user://attacks/high_kick.glb",
+      "animation_file": "res://default_attacks/high_kick.glb",
       "box": [
         82.4017333984375,
         -90.7412109375
       ],
-      "dmg": 15.0,
+      "dmg": 14.0,
       "hitbox_authored": true,
       "hitbox_rotation": -35.0,
       "hitbox_shape": "ellipse",
+      "hitstun": 0.4,
       "radius": 28.0,
       "radius_x": 28.0,
       "radius_y": 13.0,
       "recover": 0.2833333333333333,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.116666666666667,
+      "startup": 0.15,
       "support": "auto"
     },
     "hook": {
       "active": 0.133333333333333,
       "animation": "hook",
-      "animation_file": "user://attacks/hook.glb",
+      "animation_file": "res://default_attacks/hook.glb",
       "box": [
         26.188720703125,
         -92.7574157714844
@@ -356,6 +359,7 @@
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "ellipse",
+      "hitstun": 0.3333,
       "radius": 21.0,
       "radius_x": 21.0,
       "radius_y": 13.0,
@@ -368,7 +372,7 @@
     "jab": {
       "active": 0.05,
       "animation": "jab",
-      "animation_file": "user://attacks/jab.glb",
+      "animation_file": "res://default_attacks/jab.glb",
       "box": [
         45.856689453125,
         -91.9511108398438
@@ -377,6 +381,7 @@
       "hitbox_authored": true,
       "hitbox_rotation": -10.0,
       "hitbox_shape": "ellipse",
+      "hitstun": 0.1833,
       "radius": 27.0,
       "radius_x": 27.0,
       "radius_y": 10.0,
@@ -389,33 +394,34 @@
     "middle_kick": {
       "active": 0.0666666666666667,
       "animation": "middle_kick",
-      "animation_file": "user://attacks/middle_kick.glb",
+      "animation_file": "res://default_attacks/middle_kick.glb",
       "box": [
         74.448974609375,
         -66.837158203125
       ],
-      "dmg": 11.0,
+      "dmg": 10.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "ellipse",
+      "hitstun": 0.3,
       "radius": 31.0,
       "radius_x": 31.0,
       "radius_y": 14.0,
       "recover": 0.23333333333333334,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.1,
+      "startup": 0.1333,
       "support": "auto"
     },
     "spinning_backfist": {
       "active": 0.0833333333333333,
       "animation": "spinning_backfist",
-      "animation_file": "user://attacks/spinning_backfist.glb",
+      "animation_file": "res://default_attacks/spinning_backfist.glb",
       "box": [
         38.7293701171875,
         -97.1878662109375
       ],
-      "dmg": 19.0,
+      "dmg": 18.0,
       "hitbox_authored": true,
       "hitbox_rotation": -15.0,
       "hitbox_shape": "ellipse",
@@ -431,7 +437,7 @@
     "spinning_kick": {
       "active": 0.0833333333333333,
       "animation": "spinning_kick",
-      "animation_file": "user://attacks/spinning_kick.glb",
+      "animation_file": "res://default_attacks/spinning_kick.glb",
       "box": [
         66.2501831054688,
         -85.4920654296875
@@ -452,33 +458,34 @@
     "sweep": {
       "active": 0.0833333333333333,
       "animation": "sweep",
-      "animation_file": "user://attacks/sweep.glb",
+      "animation_file": "res://default_attacks/sweep.glb",
       "box": [
         85.1121215820313,
         -10.1018676757813
       ],
-      "dmg": 9.0,
+      "dmg": 8.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "ellipse",
+      "hitstun": 0.35,
       "radius": 42.0,
       "radius_x": 42.0,
       "radius_y": 13.0,
       "recover": 0.31666666666666665,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.116666666666667,
+      "startup": 0.1667,
       "support": "auto"
     },
     "uppercut": {
       "active": 0.0833333333333333,
       "animation": "uppercut",
-      "animation_file": "user://attacks/uppercut.glb",
+      "animation_file": "res://default_attacks/uppercut.glb",
       "box": [
         35.3945922851563,
         -91.1445617675781
       ],
-      "dmg": 15.0,
+      "dmg": 18.0,
       "hitbox_authored": true,
       "hitbox_rotation": 0.0,
       "hitbox_shape": "ellipse",
@@ -488,13 +495,13 @@
       "recover": 0.26666666666666666,
       "rig_id": "ragdoll_brawl_humanoid_v1",
       "source_forward": -1.0,
-      "startup": 0.25,
+      "startup": 0.2167,
       "support": "auto"
     }
   },
   "neutral": {
     "animation": "NEUTRE",
-    "animation_file": "user://attacks/neutral.glb",
+    "animation_file": "res://default_attacks/neutral.glb",
     "rig_id": "ragdoll_brawl_humanoid_v1",
     "source_forward": -1.0,
     "support": "both"

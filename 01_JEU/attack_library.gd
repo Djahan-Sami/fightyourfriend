@@ -1,14 +1,47 @@
 extends RefCounted
 class_name AttackLibrary
 
-# Donnees de combat modifiables sans toucher au code. Les animations sont
-# conservees dans user://attacks et les reglages dans attack_manifest.json.
+# Donnees de combat modifiables sans toucher au code. Pendant le developpement,
+# animations et reglages vivent dans le projet afin d'etre suivis par GitHub.
+# Une version Windows exportee utilise sa copie locale, car son PCK est en lecture
+# seule, et recoit automatiquement les animations publiees avec le jeu.
 
-const DIR := "user://attacks"
-const MANIFEST := DIR + "/attack_manifest.json"
+const USER_DIR := "user://attacks"
 const BUNDLED_DIR := "res://default_attacks"
+const BACKUP_FOLDER := "animations"
 const CANONICAL_RIG_ID := "ragdoll_brawl_humanoid_v1"
 const CANONICAL_RIG_VERSION := 1
+const BALANCE_VERSION := 2
+
+# Reglage de combat uniquement : aucune pose, duree, trajectoire, hitbox ou
+# impulsion creee dans l'atelier n'est modifiee par cette migration.
+const BALANCE_V1 := {
+	"jab": {"hitstun": 0.1833},
+	"uppercut": {"dmg": 18.0},
+	"hook": {"hitstun": 0.3333},
+	"spinning_backfist": {"dmg": 22.0},
+	"air_hammer": {"dmg": 14.0},
+	"middle_kick": {"dmg": 10.0, "hitstun": 0.3},
+	"high_kick": {"dmg": 14.0, "hitstun": 0.4},
+	"sweep": {"dmg": 8.0, "hitstun": 0.35},
+	"front_kick": {"dmg": 18.0},
+	"air_rising_kick": {"dmg": 15.0},
+	"dive_kick": {"dmg": 15.0},
+	"air_roundhouse": {"dmg": 12.0, "hitstun": 0.3167},
+}
+
+const BALANCE_V2 := {
+	"uppercut": {"startup": 0.2167},
+	"spinning_backfist": {"dmg": 18.0},
+	"air_cross": {"startup": 0.1667, "recover": 0.2},
+	"middle_kick": {"startup": 0.1333},
+	"high_kick": {"startup": 0.15},
+	"sweep": {"startup": 0.1667},
+	"front_kick": {"recover": 0.25},
+	"air_rising_kick": {"startup": 0.2833},
+	"air_side_kick": {"startup": 0.1833, "recover": 0.2333},
+	"air_roundhouse": {"startup": 0.15},
+}
 
 const DEFAULT_SLOTS := {
 	"ground/punch/neutral": "jab",
@@ -37,12 +70,26 @@ static var _loaded := false
 static var _data: Dictionary = {}
 
 
+static func uses_project_storage() -> bool:
+	return OS.has_feature("editor") and DirAccess.dir_exists_absolute(
+		ProjectSettings.globalize_path(BUNDLED_DIR))
+
+
+static func storage_dir() -> String:
+	return BUNDLED_DIR if uses_project_storage() else USER_DIR
+
+
+static func _manifest_file() -> String:
+	return storage_dir().path_join("attack_manifest.json")
+
+
 static func _ensure() -> void:
 	if _loaded:
 		return
 	_loaded = true
 	_data = {
 		"version": 3,
+		"balance_version": 0,
 		"rig": {"id": CANONICAL_RIG_ID, "version": CANONICAL_RIG_VERSION},
 		"slots": DEFAULT_SLOTS.duplicate(true),
 		"moves": {},
@@ -51,14 +98,17 @@ static func _ensure() -> void:
 		"crouch": {},
 		"hurtboxes": {"neutral": {}, "guard": {}, "crouch": {}, "moves": {}},
 	}
-	DirAccess.make_dir_recursive_absolute(DIR)
-	if not FileAccess.file_exists(MANIFEST):
+	var active_dir := storage_dir()
+	if active_dir == USER_DIR:
+		DirAccess.make_dir_recursive_absolute(active_dir)
+	var active_manifest := _manifest_file()
+	if not FileAccess.file_exists(active_manifest):
 		# Une nouvelle installation recoit les animations publiees avec le jeu.
 		# Les donnees d'un joueur existant ne sont jamais ecrasees.
-		if not _install_bundled_defaults():
+		if active_dir == USER_DIR and not _install_bundled_defaults():
 			_save()
 			return
-	var file := FileAccess.open(MANIFEST, FileAccess.READ)
+	var file := FileAccess.open(active_manifest, FileAccess.READ)
 	if file == null:
 		return
 	var parsed = JSON.parse_string(file.get_as_text())
@@ -88,6 +138,28 @@ static func _ensure() -> void:
 	# convertira au format du squelette commun.
 	if parsed.get("rig") is Dictionary:
 		_data["rig"] = parsed["rig"]
+	_data["balance_version"] = int(parsed.get("balance_version", 0))
+	if int(_data["balance_version"]) < BALANCE_VERSION:
+		_apply_balance_migration(int(_data["balance_version"]))
+
+
+static func _apply_balance_values(values: Dictionary) -> void:
+	for move_name in values:
+		var settings = _data["moves"].get(move_name, {})
+		if not (settings is Dictionary):
+			settings = {}
+		for key in values[move_name]:
+			settings[key] = values[move_name][key]
+		_data["moves"][move_name] = settings
+
+
+static func _apply_balance_migration(from_version: int) -> void:
+	if from_version < 1:
+		_apply_balance_values(BALANCE_V1)
+	if from_version < 2:
+		_apply_balance_values(BALANCE_V2)
+	_data["balance_version"] = BALANCE_VERSION
+	_save()
 
 
 static func _install_bundled_defaults() -> bool:
@@ -100,7 +172,7 @@ static func _install_bundled_defaults() -> bool:
 		if not bundled.current_is_dir() and (file_name.get_extension().to_lower() == "glb"
 		or file_name == "attack_manifest.json"):
 			var source_path := BUNDLED_DIR.path_join(file_name)
-			var target_path := DIR.path_join(file_name)
+			var target_path := USER_DIR.path_join(file_name)
 			var source := FileAccess.open(source_path, FileAccess.READ)
 			if source:
 				var target := FileAccess.open(target_path, FileAccess.WRITE)
@@ -110,12 +182,31 @@ static func _install_bundled_defaults() -> bool:
 				source.close()
 		file_name = bundled.get_next()
 	bundled.list_dir_end()
-	return FileAccess.file_exists(MANIFEST)
+	return FileAccess.file_exists(USER_DIR.path_join("attack_manifest.json"))
+
+
+static func _normalize_animation_paths_for_storage() -> void:
+	var active_dir := storage_dir()
+	for context in ["guard", "neutral", "crouch"]:
+		var entry = _data.get(context, {})
+		if entry is Dictionary and str(entry.get("animation_file", "")) != "":
+			entry["animation_file"] = active_dir.path_join(
+				str(entry["animation_file"]).get_file())
+	var moves = _data.get("moves", {})
+	if moves is Dictionary:
+		for move_name in moves:
+			var move = moves[move_name]
+			if move is Dictionary and str(move.get("animation_file", "")) != "":
+				move["animation_file"] = active_dir.path_join(
+					str(move["animation_file"]).get_file())
 
 
 static func _save() -> bool:
-	DirAccess.make_dir_recursive_absolute(DIR)
-	var file := FileAccess.open(MANIFEST, FileAccess.WRITE)
+	var active_dir := storage_dir()
+	if active_dir == USER_DIR:
+		DirAccess.make_dir_recursive_absolute(active_dir)
+	_normalize_animation_paths_for_storage()
+	var file := FileAccess.open(_manifest_file(), FileAccess.WRITE)
 	if file == null:
 		return false
 	file.store_string(JSON.stringify(_data, "  "))
@@ -131,7 +222,26 @@ static func reload() -> void:
 
 static func manifest_path() -> String:
 	_ensure()
-	return MANIFEST
+	return _manifest_file()
+
+
+static func storage_absolute_path() -> String:
+	return ProjectSettings.globalize_path(storage_dir())
+
+
+static func _resolve_animation_file(file: String) -> String:
+	if file == "":
+		return ""
+	# Les anciens manifestes utilisaient user://. En mode projet, le fichier du
+	# depot portant le meme nom devient la source de verite sans casser les
+	# anciennes installations.
+	var active_copy := storage_dir().path_join(file.get_file())
+	if FileAccess.file_exists(active_copy):
+		return ProjectSettings.globalize_path(active_copy)
+	if (file.begins_with("user://") or file.begins_with("res://")) \
+	and FileAccess.file_exists(file):
+		return ProjectSettings.globalize_path(file)
+	return file if FileAccess.file_exists(file) else ""
 
 
 static func slot_key(context: String, button: String, direction: String) -> String:
@@ -212,12 +322,8 @@ static func clip_info(move_name: String) -> Dictionary:
 	var rig_id := str(custom.get("rig_id", ""))
 	if rig_id != "" and rig_id != CANONICAL_RIG_ID:
 		return {}
-	var file := str(custom.get("animation_file", ""))
+	var file := _resolve_animation_file(str(custom.get("animation_file", "")))
 	if file == "":
-		return {}
-	if file.begins_with("user://"):
-		file = ProjectSettings.globalize_path(file)
-	if not FileAccess.file_exists(file):
 		return {}
 	return {
 		"file": file,
@@ -243,12 +349,8 @@ static func guard_clip_info() -> Dictionary:
 	var rig_id := str(custom.get("rig_id", ""))
 	if rig_id != "" and rig_id != CANONICAL_RIG_ID:
 		return {}
-	var file := str(custom.get("animation_file", ""))
+	var file := _resolve_animation_file(str(custom.get("animation_file", "")))
 	if file == "":
-		return {}
-	if file.begins_with("user://"):
-		file = ProjectSettings.globalize_path(file)
-	if not FileAccess.file_exists(file):
 		return {}
 	return {
 		"file": file,
@@ -271,12 +373,8 @@ static func neutral_clip_info() -> Dictionary:
 	var rig_id := str(custom.get("rig_id", ""))
 	if rig_id != "" and rig_id != CANONICAL_RIG_ID:
 		return {}
-	var file := str(custom.get("animation_file", ""))
+	var file := _resolve_animation_file(str(custom.get("animation_file", "")))
 	if file == "":
-		return {}
-	if file.begins_with("user://"):
-		file = ProjectSettings.globalize_path(file)
-	if not FileAccess.file_exists(file):
 		return {}
 	return {
 		"file": file,
@@ -299,12 +397,8 @@ static func crouch_clip_info() -> Dictionary:
 	var rig_id := str(custom.get("rig_id", ""))
 	if rig_id != "" and rig_id != CANONICAL_RIG_ID:
 		return {}
-	var file := str(custom.get("animation_file", ""))
+	var file := _resolve_animation_file(str(custom.get("animation_file", "")))
 	if file == "":
-		return {}
-	if file.begins_with("user://"):
-		file = ProjectSettings.globalize_path(file)
-	if not FileAccess.file_exists(file):
 		return {}
 	return {
 		"file": file,
@@ -367,7 +461,7 @@ static func import_clip(move_name: String, source_path: String) -> String:
 	var src := FileAccess.open(source_path, FileAccess.READ)
 	if src == null:
 		return ""
-	var dst_path := "%s/%s.glb" % [DIR, move_name]
+	var dst_path := "%s/%s.glb" % [storage_dir(), move_name]
 	var dst := FileAccess.open(dst_path, FileAccess.WRITE)
 	if dst == null:
 		src.close()
@@ -376,6 +470,91 @@ static func import_clip(move_name: String, source_path: String) -> String:
 	dst.close()
 	src.close()
 	return dst_path
+
+
+static func _backup_root() -> String:
+	var project_parent := ProjectSettings.globalize_path("res://..").simplify_path()
+	return project_parent.path_join("05_SAUVEGARDES")
+
+
+static func _copy_file(source_path: String, target_path: String) -> bool:
+	var source := FileAccess.open(source_path, FileAccess.READ)
+	if source == null:
+		return false
+	var target := FileAccess.open(target_path, FileAccess.WRITE)
+	if target == null:
+		source.close()
+		return false
+	target.store_buffer(source.get_buffer(source.get_length()))
+	target.close()
+	source.close()
+	return true
+
+
+static func create_backup() -> String:
+	_ensure()
+	var now := Time.get_datetime_dict_from_system()
+	var stamp := "%04d-%02d-%02d_%02d-%02d-%02d" % [
+		now.year, now.month, now.day, now.hour, now.minute, now.second]
+	var destination := _backup_root().path_join("%s_%s" % [BACKUP_FOLDER, stamp])
+	if DirAccess.make_dir_recursive_absolute(destination) != OK:
+		return ""
+	var source_dir := DirAccess.open(storage_dir())
+	if source_dir == null:
+		return ""
+	var copied := 0
+	source_dir.list_dir_begin()
+	var file_name := source_dir.get_next()
+	while file_name != "":
+		if not source_dir.current_is_dir() and (file_name.get_extension().to_lower() == "glb" \
+		or file_name == "attack_manifest.json"):
+			if _copy_file(storage_dir().path_join(file_name), destination.path_join(file_name)):
+				copied += 1
+		file_name = source_dir.get_next()
+	source_dir.list_dir_end()
+	return destination if copied > 0 else ""
+
+
+static func latest_backup() -> String:
+	var root_path := _backup_root()
+	var root_dir := DirAccess.open(root_path)
+	if root_dir == null:
+		return ""
+	var latest := ""
+	root_dir.list_dir_begin()
+	var entry := root_dir.get_next()
+	while entry != "":
+		if root_dir.current_is_dir() and entry.begins_with(BACKUP_FOLDER + "_") \
+		and entry > latest:
+			latest = entry
+		entry = root_dir.get_next()
+	root_dir.list_dir_end()
+	return root_path.path_join(latest) if latest != "" else ""
+
+
+static func restore_latest_backup() -> String:
+	var source_path := latest_backup()
+	if source_path == "":
+		return ""
+	var source_dir := DirAccess.open(source_path)
+	if source_dir == null:
+		return ""
+	if storage_dir() == USER_DIR:
+		DirAccess.make_dir_recursive_absolute(USER_DIR)
+	var copied := 0
+	source_dir.list_dir_begin()
+	var file_name := source_dir.get_next()
+	while file_name != "":
+		if not source_dir.current_is_dir() and (file_name.get_extension().to_lower() == "glb" \
+		or file_name == "attack_manifest.json"):
+			if _copy_file(source_path.path_join(file_name), storage_dir().path_join(file_name)):
+				copied += 1
+		file_name = source_dir.get_next()
+	source_dir.list_dir_end()
+	if copied == 0:
+		return ""
+	reload()
+	return source_path
 
 
 static func list_animations(path: String) -> PackedStringArray:

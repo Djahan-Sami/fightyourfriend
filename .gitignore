@@ -38,3 +38,6 @@ CONFIG_LOCAL.bat
 
 # Temporary reports
 *.log
+
+# Windows exports
+build/
