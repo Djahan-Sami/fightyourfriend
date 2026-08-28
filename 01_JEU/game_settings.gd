@@ -5,7 +5,9 @@ const PATH := "user://game_settings.json"
 const SKINS_FOLDER := "03_SKINS_PERSONNAGES"
 const STAGES_FOLDER := "04_SKINS_TERRAINS"
 const DEFAULT_RESET_KEY := KEY_BACKSPACE
+const DEFAULT_PAUSE_KEY := KEY_ESCAPE
 const ACTIONS := ["left", "right", "up", "down", "jump", "punch", "kick", "grab"]
+const PAD_ACTIONS := ["jump", "punch", "kick", "grab"]
 const ACTION_LABELS := {
 	"left": "Gauche", "right": "Droite", "up": "Haut", "down": "Bas",
 	"jump": "Saut", "punch": "Poing", "kick": "Pied", "grab": "Saisie",
@@ -20,10 +22,36 @@ const DEFAULT_KEYS := [
 		"jump": KEY_KP_0, "punch": KEY_KP_1, "kick": KEY_KP_2, "grab": KEY_KP_3,
 	},
 ]
+const DEFAULT_PAD_BINDINGS := [
+	{
+		"jump": {"type": "button", "index": JOY_BUTTON_A},
+		"punch": {"type": "button", "index": JOY_BUTTON_X},
+		"kick": {"type": "button", "index": JOY_BUTTON_B},
+		"grab": {"type": "button", "index": JOY_BUTTON_Y},
+	},
+	{
+		"jump": {"type": "button", "index": JOY_BUTTON_A},
+		"punch": {"type": "button", "index": JOY_BUTTON_X},
+		"kick": {"type": "button", "index": JOY_BUTTON_B},
+		"grab": {"type": "button", "index": JOY_BUTTON_Y},
+	},
+]
+const DEFAULT_PAD_RESET := {"type": "button", "index": JOY_BUTTON_BACK}
+const DEFAULT_PAD_PAUSE := {"type": "button", "index": JOY_BUTTON_START}
+const DEFAULT_SINGLE_CONTROLLER_PLAYER := 0
+const DEFAULT_STICK_DEADZONE := 0.18
+const DEFAULT_STICK_SENSITIVITY := 1.0
 
 static var _loaded := false
 static var _keys: Array[Dictionary] = []
 static var _reset_key := DEFAULT_RESET_KEY
+static var _pause_key := DEFAULT_PAUSE_KEY
+static var _pad_bindings: Array[Dictionary] = []
+static var _pad_reset: Dictionary = DEFAULT_PAD_RESET.duplicate(true)
+static var _pad_pause: Dictionary = DEFAULT_PAD_PAUSE.duplicate(true)
+static var _single_controller_player := DEFAULT_SINGLE_CONTROLLER_PLAYER
+static var _stick_deadzone := DEFAULT_STICK_DEADZONE
+static var _stick_sensitivity := DEFAULT_STICK_SENSITIVITY
 static var _skins: Array[String] = ["", ""]
 static var _stage := ""
 static var _workshop_requested := false
@@ -35,6 +63,16 @@ static func _ensure() -> void:
 	_loaded = true
 	_keys = [DEFAULT_KEYS[0].duplicate(true), DEFAULT_KEYS[1].duplicate(true)]
 	_reset_key = DEFAULT_RESET_KEY
+	_pause_key = DEFAULT_PAUSE_KEY
+	_pad_bindings = [
+		DEFAULT_PAD_BINDINGS[0].duplicate(true),
+		DEFAULT_PAD_BINDINGS[1].duplicate(true),
+	]
+	_pad_reset = DEFAULT_PAD_RESET.duplicate(true)
+	_pad_pause = DEFAULT_PAD_PAUSE.duplicate(true)
+	_single_controller_player = DEFAULT_SINGLE_CONTROLLER_PLAYER
+	_stick_deadzone = DEFAULT_STICK_DEADZONE
+	_stick_sensitivity = DEFAULT_STICK_SENSITIVITY
 	_skins = ["", ""]
 	_stage = ""
 	ensure_skin_directory()
@@ -51,6 +89,9 @@ static func _ensure() -> void:
 	var reset_value = parsed.get("reset_key", DEFAULT_RESET_KEY)
 	if reset_value is float or reset_value is int:
 		_reset_key = int(reset_value)
+	var pause_value = parsed.get("pause_key", DEFAULT_PAUSE_KEY)
+	if pause_value is float or pause_value is int:
+		_pause_key = int(pause_value)
 	var controls = parsed.get("controls", [])
 	if controls is Array:
 		for player in mini(2, controls.size()):
@@ -60,6 +101,27 @@ static func _ensure() -> void:
 				var value = controls[player].get(action, _keys[player][action])
 				if value is float or value is int:
 					_keys[player][action] = int(value)
+	var controller_controls = parsed.get("controller_controls", [])
+	if controller_controls is Array:
+		for player in mini(2, controller_controls.size()):
+			if not (controller_controls[player] is Dictionary):
+				continue
+			for action in PAD_ACTIONS:
+				_pad_bindings[player][action] = _valid_pad_binding(
+					controller_controls[player].get(action, {}),
+					_pad_bindings[player][action])
+	_pad_reset = _valid_pad_binding(parsed.get("controller_reset", {}), _pad_reset, false)
+	_pad_pause = _valid_pad_binding(parsed.get("controller_pause", {}), _pad_pause, false)
+	var controller_player_value = parsed.get(
+		"single_controller_player", DEFAULT_SINGLE_CONTROLLER_PLAYER)
+	if controller_player_value is int or controller_player_value is float:
+		_single_controller_player = clampi(int(controller_player_value), 0, 1)
+	var deadzone_value = parsed.get("stick_deadzone", DEFAULT_STICK_DEADZONE)
+	if deadzone_value is int or deadzone_value is float:
+		_stick_deadzone = clampf(float(deadzone_value), 0.05, 0.40)
+	var sensitivity_value = parsed.get("stick_sensitivity", DEFAULT_STICK_SENSITIVITY)
+	if sensitivity_value is int or sensitivity_value is float:
+		_stick_sensitivity = clampf(float(sensitivity_value), 0.60, 1.50)
 	var skins = parsed.get("skins", [])
 	if skins is Array:
 		for player in mini(2, skins.size()):
@@ -77,9 +139,16 @@ static func save() -> bool:
 	if file == null:
 		return false
 	file.store_string(JSON.stringify({
-		"version": 4,
+		"version": 6,
 		"controls": _keys,
 		"reset_key": _reset_key,
+		"pause_key": _pause_key,
+		"controller_controls": _pad_bindings,
+		"controller_reset": _pad_reset,
+		"controller_pause": _pad_pause,
+		"single_controller_player": _single_controller_player,
+		"stick_deadzone": _stick_deadzone,
+		"stick_sensitivity": _stick_sensitivity,
 		"skins": _skins,
 		"stage": _stage,
 	}, "  "))
@@ -91,6 +160,16 @@ static func reset_controls() -> void:
 	_ensure()
 	_keys = [DEFAULT_KEYS[0].duplicate(true), DEFAULT_KEYS[1].duplicate(true)]
 	_reset_key = DEFAULT_RESET_KEY
+	_pause_key = DEFAULT_PAUSE_KEY
+	_pad_bindings = [
+		DEFAULT_PAD_BINDINGS[0].duplicate(true),
+		DEFAULT_PAD_BINDINGS[1].duplicate(true),
+	]
+	_pad_reset = DEFAULT_PAD_RESET.duplicate(true)
+	_pad_pause = DEFAULT_PAD_PAUSE.duplicate(true)
+	_single_controller_player = DEFAULT_SINGLE_CONTROLLER_PLAYER
+	_stick_deadzone = DEFAULT_STICK_DEADZONE
+	_stick_sensitivity = DEFAULT_STICK_SENSITIVITY
 	save()
 	apply_input_map()
 
@@ -263,6 +342,8 @@ static func assign_key(player: int, action: String, keycode: int) -> void:
 				_keys[other_player][other_action] = previous
 	if _reset_key == keycode:
 		_reset_key = previous
+	if _pause_key == keycode:
+		_pause_key = previous
 	_keys[player][action] = keycode
 	save()
 	apply_input_map()
@@ -287,19 +368,238 @@ static func assign_reset_key(keycode: int) -> void:
 		for action in ACTIONS:
 			if int(_keys[player][action]) == keycode:
 				_keys[player][action] = previous
+	if _pause_key == keycode:
+		_pause_key = previous
 	_reset_key = keycode
 	save()
 	apply_input_map()
 
 
+static func pause_key() -> int:
+	_ensure()
+	return _pause_key
+
+
+static func pause_key_name() -> String:
+	var result := OS.get_keycode_string(pause_key())
+	return result if result != "" else "Touche inconnue"
+
+
+static func assign_pause_key(keycode: int) -> void:
+	_ensure()
+	if keycode == 0:
+		return
+	var previous := _pause_key
+	for player in 2:
+		for action in ACTIONS:
+			if int(_keys[player][action]) == keycode:
+				_keys[player][action] = previous
+	if _reset_key == keycode:
+		_reset_key = previous
+	_pause_key = keycode
+	save()
+	apply_input_map()
+
+
+static func controller_binding(player: int, action: String) -> Dictionary:
+	_ensure()
+	player = clampi(player, 0, 1)
+	if not action in PAD_ACTIONS:
+		return {}
+	return _pad_bindings[player][action].duplicate(true)
+
+
+static func controller_binding_name(player: int, action: String) -> String:
+	return pad_binding_name(controller_binding(player, action))
+
+
+static func controller_reset_binding() -> Dictionary:
+	_ensure()
+	return _pad_reset.duplicate(true)
+
+
+static func controller_pause_binding() -> Dictionary:
+	_ensure()
+	return _pad_pause.duplicate(true)
+
+
+static func controller_reset_name() -> String:
+	return pad_binding_name(controller_reset_binding())
+
+
+static func controller_pause_name() -> String:
+	return pad_binding_name(controller_pause_binding())
+
+
+static func single_controller_player() -> int:
+	_ensure()
+	return _single_controller_player
+
+
+static func set_single_controller_player(player: int) -> bool:
+	_ensure()
+	_single_controller_player = clampi(player, 0, 1)
+	return save()
+
+
+static func stick_deadzone() -> float:
+	_ensure()
+	return _stick_deadzone
+
+
+static func set_stick_deadzone(value: float) -> bool:
+	_ensure()
+	_stick_deadzone = clampf(value, 0.05, 0.40)
+	return save()
+
+
+static func stick_sensitivity() -> float:
+	_ensure()
+	return _stick_sensitivity
+
+
+static func set_stick_sensitivity(value: float) -> bool:
+	_ensure()
+	_stick_sensitivity = clampf(value, 0.60, 1.50)
+	return save()
+
+
+static func assign_controller_binding(player: int, action: String, binding: Dictionary) -> bool:
+	_ensure()
+	player = clampi(player, 0, 1)
+	if not action in PAD_ACTIONS:
+		return false
+	var checked := _valid_pad_binding(binding, {}, true)
+	if checked.is_empty() or _same_pad_binding(checked, _pad_reset) \
+	or _same_pad_binding(checked, _pad_pause):
+		return false
+	var previous: Dictionary = _pad_bindings[player][action].duplicate(true)
+	# Sur une meme manette, un bouton ne lance jamais deux actions. Comme pour
+	# le clavier, les deux affectations sont echangees.
+	for other_action in PAD_ACTIONS:
+		if other_action != action \
+		and _same_pad_binding(_pad_bindings[player][other_action], checked):
+			_pad_bindings[player][other_action] = previous
+	_pad_bindings[player][action] = checked
+	var saved := save()
+	apply_input_map()
+	return saved
+
+
+static func assign_controller_reset(binding: Dictionary) -> bool:
+	return _assign_controller_global("reset", binding)
+
+
+static func assign_controller_pause(binding: Dictionary) -> bool:
+	return _assign_controller_global("pause", binding)
+
+
+static func _assign_controller_global(which: String, binding: Dictionary) -> bool:
+	_ensure()
+	var checked := _valid_pad_binding(binding, {}, false)
+	if checked.is_empty():
+		return false
+	var other := _pad_pause if which == "reset" else _pad_reset
+	if _same_pad_binding(checked, other):
+		return false
+	# Pause et recommencer sont globaux : on refuse un bouton de combat afin
+	# qu'aucun joueur ne puisse relancer la partie en donnant un coup.
+	for player in 2:
+		for action in PAD_ACTIONS:
+			if _same_pad_binding(_pad_bindings[player][action], checked):
+				return false
+	if which == "reset":
+		_pad_reset = checked
+	else:
+		_pad_pause = checked
+	var saved := save()
+	apply_input_map()
+	return saved
+
+
+static func pad_binding_from_button(button_index: int) -> Dictionary:
+	return _valid_pad_binding({"type": "button", "index": button_index}, {})
+
+
+static func pad_binding_from_trigger(axis: int) -> Dictionary:
+	if axis not in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:
+		return {}
+	return {"type": "axis", "index": axis, "value": 1.0}
+
+
+static func pad_event(binding: Dictionary, device: int) -> InputEvent:
+	var checked := _valid_pad_binding(binding, {})
+	if checked.is_empty():
+		return null
+	if checked["type"] == "axis":
+		var motion := InputEventJoypadMotion.new()
+		motion.device = device
+		motion.axis = int(checked["index"])
+		motion.axis_value = float(checked.get("value", 1.0))
+		return motion
+	var button := InputEventJoypadButton.new()
+	button.device = device
+	button.button_index = int(checked["index"])
+	return button
+
+
+static func pad_binding_name(binding: Dictionary) -> String:
+	var checked := _valid_pad_binding(binding, {})
+	if checked.is_empty():
+		return "Non defini"
+	var index := int(checked["index"])
+	if checked["type"] == "axis":
+		return "Gachette LT" if index == JOY_AXIS_TRIGGER_LEFT else "Gachette RT"
+	var names := {
+		JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X", JOY_BUTTON_Y: "Y",
+		JOY_BUTTON_BACK: "Retour / Select", JOY_BUTTON_GUIDE: "Guide",
+		JOY_BUTTON_START: "Start", JOY_BUTTON_LEFT_STICK: "Stick gauche",
+		JOY_BUTTON_RIGHT_STICK: "Stick droit", JOY_BUTTON_LEFT_SHOULDER: "LB / L1",
+		JOY_BUTTON_RIGHT_SHOULDER: "RB / R1", JOY_BUTTON_DPAD_UP: "Croix haut",
+		JOY_BUTTON_DPAD_DOWN: "Croix bas", JOY_BUTTON_DPAD_LEFT: "Croix gauche",
+		JOY_BUTTON_DPAD_RIGHT: "Croix droite", JOY_BUTTON_MISC1: "Bouton partage",
+		JOY_BUTTON_PADDLE1: "Palette 1", JOY_BUTTON_PADDLE2: "Palette 2",
+		JOY_BUTTON_PADDLE3: "Palette 3", JOY_BUTTON_PADDLE4: "Palette 4",
+		JOY_BUTTON_TOUCHPAD: "Pave tactile",
+	}
+	return str(names.get(index, "Bouton %d" % index))
+
+
+static func _valid_pad_binding(value, fallback: Dictionary,
+		allow_axis := true) -> Dictionary:
+	if not (value is Dictionary):
+		return fallback.duplicate(true)
+	var kind := str(value.get("type", ""))
+	var raw_index = value.get("index", -1)
+	if not (raw_index is int or raw_index is float):
+		return fallback.duplicate(true)
+	var index := int(raw_index)
+	if kind == "button" and index >= 0 and index < 64:
+		return {"type": "button", "index": index}
+	if allow_axis and kind == "axis" \
+	and index in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:
+		return {"type": "axis", "index": index, "value": 1.0}
+	return fallback.duplicate(true)
+
+
+static func _same_pad_binding(a: Dictionary, b: Dictionary) -> bool:
+	return not a.is_empty() and not b.is_empty() \
+		and str(a.get("type", "")) == str(b.get("type", "")) \
+		and int(a.get("index", -1)) == int(b.get("index", -2))
+
+
 static func apply_input_map() -> void:
 	_ensure()
-	if not InputMap.has_action("reset"):
-		InputMap.add_action("reset")
-	InputMap.action_erase_events("reset")
+	for global_action in ["reset", "pause"]:
+		if not InputMap.has_action(global_action):
+			InputMap.add_action(global_action)
+		InputMap.action_erase_events(global_action)
 	var reset_event := InputEventKey.new()
 	reset_event.keycode = reset_key()
 	InputMap.action_add_event("reset", reset_event)
+	var pause_event := InputEventKey.new()
+	pause_event.keycode = pause_key()
+	InputMap.action_add_event("pause", pause_event)
 	for player in 2:
 		for action in ACTIONS:
 			var action_name := "p%d_%s" % [player + 1, action]

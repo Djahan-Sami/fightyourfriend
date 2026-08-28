@@ -26,6 +26,8 @@ const GROUND_BRAKE  := 4800.0
 const AIR_SPEED     := 200.0
 const JUMP_VEL      := -740.0
 const CROUCH_SPEED  := 90.0
+const STICK_VERTICAL_THRESHOLD := 0.55
+const STICK_ATTACK_THRESHOLD := 0.42
 
 # Fenetre de memorisation d'un appui. Assez large pour couvrir la fin d'une
 # grosse recuperation, assez courte pour ne pas declencher un coup "fantome"
@@ -559,14 +561,59 @@ func _separate() -> void:
 		global_position.x += signf(dx if dx != 0.0 else 1.0) * push
 
 
+static func shape_stick_axis(raw: float, deadzone := -1.0,
+		sensitivity := -1.0) -> float:
+	# Petite zone morte contre la derive, puis courbe progressive : les petits
+	# mouvements servent a se placer et la fin du stick garde toute la vitesse.
+	if deadzone < 0.0:
+		deadzone = GameSettings.stick_deadzone()
+	if sensitivity < 0.0:
+		sensitivity = GameSettings.stick_sensitivity()
+	deadzone = clampf(deadzone, 0.05, 0.40)
+	sensitivity = clampf(sensitivity, 0.60, 1.50)
+	var amount := absf(raw)
+	if amount <= deadzone:
+		return 0.0
+	var normalized := clampf(
+		(amount - deadzone) / (1.0 - deadzone), 0.0, 1.0)
+	return signf(raw) * pow(normalized, 1.15 / sensitivity)
+
+
 func _dir() -> float:
-	return Input.get_axis(prefix + "_left", prefix + "_right")
+	if pad_device < 0:
+		return Input.get_axis(prefix + "_left", prefix + "_right")
+	var dpad := float(
+		int(Input.is_joy_button_pressed(pad_device, JOY_BUTTON_DPAD_RIGHT))
+		- int(Input.is_joy_button_pressed(pad_device, JOY_BUTTON_DPAD_LEFT)))
+	if dpad != 0.0:
+		return dpad
+	# Le clavier reste utilisable meme lorsqu'une manette est branchee.
+	var keyboard := float(
+		int(Input.is_key_pressed(GameSettings.key_for(index, "right")))
+		- int(Input.is_key_pressed(GameSettings.key_for(index, "left"))))
+	if keyboard != 0.0:
+		return keyboard
+	return shape_stick_axis(Input.get_joy_axis(pad_device, JOY_AXIS_LEFT_X))
+
+
+func _up_pressed() -> bool:
+	if pad_device < 0:
+		return Input.is_action_pressed(prefix + "_up")
+	return Input.is_key_pressed(GameSettings.key_for(index, "up")) \
+		or Input.is_joy_button_pressed(pad_device, JOY_BUTTON_DPAD_UP) \
+		or Input.get_joy_axis(pad_device, JOY_AXIS_LEFT_Y) <= -STICK_VERTICAL_THRESHOLD
+
+
+func _down_pressed() -> bool:
+	if pad_device < 0:
+		return Input.is_action_pressed(prefix + "_down")
+	return Input.is_key_pressed(GameSettings.key_for(index, "down")) \
+		or Input.is_joy_button_pressed(pad_device, JOY_BUTTON_DPAD_DOWN) \
+		or Input.get_joy_axis(pad_device, JOY_AXIS_LEFT_Y) >= STICK_VERTICAL_THRESHOLD
 
 
 func _held_dir() -> bool:
-	return absf(_dir()) > 0.01 \
-		or Input.is_action_pressed(prefix + "_up") \
-		or Input.is_action_pressed(prefix + "_down")
+	return absf(_dir()) > 0.01 or _up_pressed() or _down_pressed()
 
 
 func _tick_ground(delta: float) -> void:
@@ -580,7 +627,7 @@ func _tick_ground(delta: float) -> void:
 		SFX.play2d(sfx, "jump", -10.0)
 		Arena.dust(global_position, 0.35)
 		return
-	if Input.is_action_pressed(prefix + "_down"):
+	if _down_pressed():
 		state = State.CROUCH
 		_set_crouch(true)
 		_still = 0.0
@@ -608,7 +655,7 @@ func _tick_crouch(delta: float) -> void:
 	velocity.x = _dir() * CROUCH_SPEED
 	if _try_actions():
 		return
-	if not Input.is_action_pressed(prefix + "_down"):
+	if not _down_pressed():
 		_set_crouch(false)
 		state = State.IDLE
 		_still = 0.0
@@ -722,16 +769,32 @@ func _pick(button: String) -> String:
 
 
 func _attack_dir_5() -> String:
-	if Input.is_action_pressed(prefix + "_up"):
+	if _up_pressed():
 		return "up"
-	if Input.is_action_pressed(prefix + "_down"):
+	if _down_pressed():
 		return "down"
-	var side := _dir() * facing
-	if side > 0.01:
+	var side := _attack_side()
+	if side > 0.0:
 		return "forward"
-	if side < -0.01:
+	if side < 0.0:
 		return "back"
 	return "neutral"
+
+
+func _attack_side() -> float:
+	if pad_device < 0:
+		var keyboard_side := _dir() * facing
+		return signf(keyboard_side) if absf(keyboard_side) > STICK_ATTACK_THRESHOLD else 0.0
+	var digital := float(
+		int(Input.is_joy_button_pressed(pad_device, JOY_BUTTON_DPAD_RIGHT))
+		- int(Input.is_joy_button_pressed(pad_device, JOY_BUTTON_DPAD_LEFT)))
+	digital += float(
+		int(Input.is_key_pressed(GameSettings.key_for(index, "right")))
+		- int(Input.is_key_pressed(GameSettings.key_for(index, "left"))))
+	if digital != 0.0:
+		return signf(digital * facing)
+	var raw := Input.get_joy_axis(pad_device, JOY_AXIS_LEFT_X)
+	return signf(raw * facing) if absf(raw) >= STICK_VERTICAL_THRESHOLD else 0.0
 
 
 # ------------------------------------------------------------
@@ -1047,9 +1110,9 @@ func _throw_dir_just_pressed() -> String:
 
 
 func _throw_dir_held() -> String:
-	if Input.is_action_pressed(prefix + "_up"):
+	if _up_pressed():
 		return "up"
-	if Input.is_action_pressed(prefix + "_down"):
+	if _down_pressed():
 		return "down"
 	if _dir() * facing < -0.01:
 		return "back"

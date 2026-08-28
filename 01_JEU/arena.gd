@@ -759,22 +759,35 @@ func _draw_ui() -> void:
 #  Entrees
 # ------------------------------------------------------------
 const ACTIONS := ["left", "right", "up", "down", "jump", "punch", "kick", "grab"]
-const PAD_DEADZONE := 0.35
+const PAD_DEADZONE := 0.18
+const PAD_DIRECTION_THRESHOLD := 0.55
 
 
 func _register_inputs() -> void:
 	GameSettings.apply_input_map()
 	for d in Input.get_connected_joypads():
-		InputMap.action_add_event("reset", _btn(d, JOY_BUTTON_START))
+		var reset_event := GameSettings.pad_event(
+			GameSettings.controller_reset_binding(), d)
+		var pause_event := GameSettings.pad_event(
+			GameSettings.controller_pause_binding(), d)
+		if reset_event:
+			InputMap.action_add_event("reset", reset_event)
+		if pause_event:
+			InputMap.action_add_event("pause", pause_event)
 
 	var pads := Input.get_connected_joypads()
 	for i in 2:
-		pad_of[i] = pads[i] if i < pads.size() else -1
+		if pads.size() == 1:
+			pad_of[i] = pads[0] if i == GameSettings.single_controller_player() else -1
+		else:
+			pad_of[i] = pads[i] if i < pads.size() else -1
 		if i < fighters.size():
 			fighters[i].pad_device = pad_of[i]
 		for a in ACTIONS:
 			var action := "p%d_%s" % [i + 1, a]
-			InputMap.action_set_deadzone(action, PAD_DEADZONE)
+			InputMap.action_set_deadzone(action,
+				PAD_DIRECTION_THRESHOLD if a in ["left", "right", "up", "down"] \
+				else PAD_DEADZONE)
 			if pad_of[i] >= 0:
 				for ev in _pad_events(a, pad_of[i]):
 					InputMap.action_add_event(action, ev)
@@ -786,10 +799,10 @@ func _pad_events(a: String, dev: int) -> Array:
 		"right": return [_axis(dev, JOY_AXIS_LEFT_X, 1.0), _btn(dev, JOY_BUTTON_DPAD_RIGHT)]
 		"up":    return [_axis(dev, JOY_AXIS_LEFT_Y, -1.0), _btn(dev, JOY_BUTTON_DPAD_UP)]
 		"down":  return [_axis(dev, JOY_AXIS_LEFT_Y, 1.0), _btn(dev, JOY_BUTTON_DPAD_DOWN)]
-		"jump":  return [_btn(dev, JOY_BUTTON_A)]
-		"punch": return [_btn(dev, JOY_BUTTON_X)]
-		"kick":  return [_btn(dev, JOY_BUTTON_B)]
-		"grab":  return [_btn(dev, JOY_BUTTON_RIGHT_SHOULDER), _btn(dev, JOY_BUTTON_Y)]
+		"jump", "punch", "kick", "grab":
+			var event := GameSettings.pad_event(
+				GameSettings.controller_binding(0 if dev == pad_of[0] else 1, a), dev)
+			return [event] if event else []
 	return []
 
 
@@ -928,8 +941,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _end_overlay != null and _end_overlay.visible:
 		get_viewport().set_input_as_handled()
 		return
-	if event is InputEventKey and event.pressed and not event.echo \
-	and event.keycode == KEY_ESCAPE \
+	var pause_pressed := event.is_action_pressed("pause", false) \
+		if InputMap.has_action("pause") else false
+	if pause_pressed \
 	and (workshop == null or not workshop.is_open()):
 		_set_paused(not get_tree().paused)
 		get_viewport().set_input_as_handled()

@@ -15,6 +15,23 @@ Blender est facultatif pour jouer. Pour creer ou modifier les animations,
 installe Blender 5.2, renseigne son chemin dans `CONFIG_LOCAL.bat`, puis lance
 `ANIMER_LES_COUPS.bat`.
 
+## Clavier et manettes
+
+Ouvre **Configurer les touches** depuis le menu principal. Les commandes
+clavier et manette des deux joueurs sont affichees cote a cote. Le saut, le
+poing, le pied et la saisie peuvent utiliser les boutons principaux, les
+boutons d'epaule ou les gachettes. Pause et Recommencer sont aussi
+configurables separement.
+
+Le stick gauche offre un deplacement analogique progressif et la croix
+directionnelle reste disponible en meme temps. Les reglages sont sauvegardes
+automatiquement et seront recharges au prochain lancement du jeu.
+
+Le bouton **Reglages du stick** permet de choisir quel joueur utilise une
+manette lorsqu'une seule est branchee, puis d'ajuster la zone morte et la
+sensibilite. Un apercu en direct compare la position physique du stick avec le
+mouvement reellement transmis au combattant.
+
 ## Animations et sauvegardes
 
 Blender exporte directement les animations dans `01_JEU/default_attacks`.

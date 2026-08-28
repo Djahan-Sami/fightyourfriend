@@ -1,8 +1,34 @@
 extends Control
 class_name MainMenu
 
+
+class StickPreview:
+	extends Control
+	var raw_value := 0.0
+	var shaped_value := 0.0
+
+	func update_values(raw: float, shaped: float) -> void:
+		raw_value = clampf(raw, -1.0, 1.0)
+		shaped_value = clampf(shaped, -1.0, 1.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		var left := 24.0
+		var right := maxf(left + 1.0, size.x - 24.0)
+		var y := size.y * 0.5
+		draw_line(Vector2(left, y), Vector2(right, y), Color(0.43, 0.54, 0.73), 6.0)
+		var center := (left + right) * 0.5
+		draw_line(Vector2(center, y - 15.0), Vector2(center, y + 15.0),
+			Color(0.82, 0.88, 1.0), 2.0)
+		var raw_x := lerpf(left, right, (raw_value + 1.0) * 0.5)
+		var shaped_x := lerpf(left, right, (shaped_value + 1.0) * 0.5)
+		draw_circle(Vector2(raw_x, y), 6.0, Color(0.58, 0.67, 0.82))
+		draw_circle(Vector2(shaped_x, y), 10.0, Color(1.0, 0.72, 0.22))
+
+
 var _main_page: Control
 var _controls_page: Control
+var _controller_page: Control
 var _skins_page: Control
 var _stages_page: Control
 var _main_status: Label
@@ -10,13 +36,27 @@ var _capture_status: Label
 var _skins_status: Label
 var _stages_status: Label
 var _key_buttons: Dictionary = {}
+var _pad_buttons: Dictionary = {}
 var _skin_selects: Array[OptionButton] = []
 var _skin_entries: Array[Dictionary] = []
 var _stage_select: OptionButton
 var _stage_entries: Array[Dictionary] = []
 var _reset_button: Button
+var _pause_key_button: Button
+var _pad_reset_button: Button
+var _pad_pause_button: Button
+var _controller_player_select: OptionButton
+var _controller_status: Label
+var _deadzone_slider: HSlider
+var _sensitivity_slider: HSlider
+var _deadzone_value: Label
+var _sensitivity_value: Label
+var _stick_preview: StickPreview
+var _stick_live_label: Label
 var _capture_player := -1
 var _capture_action := ""
+var _capture_kind := ""
+var _capture_focus_button: Button
 var _last_hover_sound_ms := 0
 
 
@@ -27,8 +67,10 @@ func _ready() -> void:
 	_build_background()
 	_build_main_page()
 	_build_controls_page()
+	_build_controller_page()
 	_build_skins_page()
 	_build_stages_page()
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	_show_main()
 
 
@@ -108,7 +150,7 @@ func _build_main_page() -> void:
 
 
 func _build_controls_page() -> void:
-	var column := _panel(Vector2(1060, 670))
+	var column := _panel(Vector2(1120, 700))
 	_controls_page = column.get_parent().get_parent().get_parent()
 	var title := Label.new()
 	title.text = "CONFIGURATION DES TOUCHES"
@@ -117,7 +159,7 @@ func _build_controls_page() -> void:
 	title.add_theme_color_override("font_color", Color(1.0, 0.78, 0.30))
 	column.add_child(title)
 	var instruction := Label.new()
-	instruction.text = "Clique sur une commande, puis appuie sur la nouvelle touche. Si elle est deja utilisee, les deux touches seront echangees."
+	instruction.text = "Clique sur une case CLAVIER ou MANETTE, puis appuie sur la nouvelle touche. Le stick gauche et la croix directionnelle fonctionnent toujours ensemble. Chaque changement est sauvegarde automatiquement."
 	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	instruction.add_theme_color_override("font_color", Color(0.78, 0.84, 0.96))
@@ -138,31 +180,59 @@ func _build_controls_page() -> void:
 		player_title.add_theme_color_override("font_color",
 			Color(0.38, 0.66, 1.0) if player == 0 else Color(1.0, 0.36, 0.34))
 		player_column.add_child(player_title)
+		var header := HBoxContainer.new()
+		player_column.add_child(header)
+		var empty := Label.new()
+		empty.custom_minimum_size.x = 102
+		header.add_child(empty)
+		for heading in ["CLAVIER", "MANETTE"]:
+			var heading_label := Label.new()
+			heading_label.text = heading
+			heading_label.custom_minimum_size.x = 150
+			heading_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			heading_label.add_theme_font_size_override("font_size", 12)
+			heading_label.add_theme_color_override("font_color", Color(0.60, 0.72, 0.94))
+			header.add_child(heading_label)
 		for action in GameSettings.ACTIONS:
 			var row := HBoxContainer.new()
 			player_column.add_child(row)
 			var label := Label.new()
 			label.text = str(GameSettings.ACTION_LABELS[action])
-			label.custom_minimum_size.x = 150
+			label.custom_minimum_size.x = 102
 			row.add_child(label)
 			var button := _menu_button("", 15)
 			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			button.custom_minimum_size.y = 37
+			button.custom_minimum_size = Vector2(150, 34)
 			button.pressed.connect(_start_capture.bind(player, action))
 			row.add_child(button)
 			_key_buttons[_key_id(player, action)] = button
-	var general := HBoxContainer.new()
-	general.alignment = BoxContainer.ALIGNMENT_CENTER
-	general.add_theme_constant_override("separation", 12)
+			var pad_button := _menu_button("", 14)
+			pad_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pad_button.custom_minimum_size = Vector2(150, 34)
+			if action in GameSettings.PAD_ACTIONS:
+				pad_button.pressed.connect(_start_pad_capture.bind(player, action))
+			else:
+				pad_button.disabled = true
+				pad_button.tooltip_text = "Le stick gauche et la croix sont tous les deux actifs."
+			row.add_child(pad_button)
+			_pad_buttons[_key_id(player, action)] = pad_button
+	var general := GridContainer.new()
+	general.columns = 3
+	general.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	general.add_theme_constant_override("h_separation", 12)
+	general.add_theme_constant_override("v_separation", 5)
 	column.add_child(general)
-	var general_label := Label.new()
-	general_label.text = "RECOMMENCER LA PARTIE"
-	general_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.36))
-	general.add_child(general_label)
-	_reset_button = _menu_button("", 15)
-	_reset_button.custom_minimum_size.x = 240
-	_reset_button.pressed.connect(_start_reset_capture)
-	general.add_child(_reset_button)
+	for heading in ["COMMANDES GENERALES", "CLAVIER", "MANETTE"]:
+		var heading_label := Label.new()
+		heading_label.text = heading
+		heading_label.custom_minimum_size.x = 220
+		heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		heading_label.add_theme_font_size_override("font_size", 12)
+		heading_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.36))
+		general.add_child(heading_label)
+	_add_general_control_row(general, "RECOMMENCER", "reset")
+	_add_general_control_row(general, "PAUSE", "pause")
 	_capture_status = Label.new()
 	_capture_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_capture_status.custom_minimum_size.y = 28
@@ -175,10 +245,133 @@ func _build_controls_page() -> void:
 	var reset := _menu_button("TOUCHES PAR DEFAUT")
 	reset.pressed.connect(_reset_controls)
 	bottom.add_child(reset)
+	var controller_settings := _menu_button("REGLAGES DU STICK")
+	controller_settings.pressed.connect(_show_controller_settings)
+	bottom.add_child(controller_settings)
 	var back := _menu_button("RETOUR")
 	back.pressed.connect(_show_main)
 	bottom.add_child(back)
 	_refresh_key_buttons()
+
+
+func _add_general_control_row(grid: GridContainer, label_text: String, action: String) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var keyboard_button := _menu_button("", 14)
+	keyboard_button.custom_minimum_size = Vector2(220, 34)
+	keyboard_button.pressed.connect(_start_global_capture.bind("keyboard", action))
+	grid.add_child(keyboard_button)
+	var pad_button := _menu_button("", 14)
+	pad_button.custom_minimum_size = Vector2(220, 34)
+	pad_button.pressed.connect(_start_global_capture.bind("controller", action))
+	grid.add_child(pad_button)
+	if action == "reset":
+		_reset_button = keyboard_button
+		_pad_reset_button = pad_button
+	else:
+		_pause_key_button = keyboard_button
+		_pad_pause_button = pad_button
+
+
+func _build_controller_page() -> void:
+	var column := _panel(Vector2(820, 620))
+	_controller_page = column.get_parent().get_parent().get_parent()
+	var title := Label.new()
+	title.text = "REGLAGES DE LA MANETTE"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 31)
+	title.add_theme_color_override("font_color", Color(1.0, 0.78, 0.30))
+	column.add_child(title)
+	var explanation := Label.new()
+	explanation.text = "Ces reglages sont communs aux deux manettes et sauvegardes automatiquement. Ils ne changent pas la vitesse maximale des combattants."
+	explanation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	explanation.add_theme_color_override("font_color", Color(0.78, 0.84, 0.96))
+	column.add_child(explanation)
+	_add_section(column, "AFFECTATION")
+	var assignment_row := HBoxContainer.new()
+	assignment_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	assignment_row.add_theme_constant_override("separation", 14)
+	column.add_child(assignment_row)
+	var assignment_label := Label.new()
+	assignment_label.text = "SI UNE SEULE MANETTE EST BRANCHEE :"
+	assignment_label.custom_minimum_size.x = 350
+	assignment_row.add_child(assignment_label)
+	_controller_player_select = OptionButton.new()
+	_controller_player_select.custom_minimum_size = Vector2(250, 44)
+	_controller_player_select.add_item("ELLE CONTROLE LE JOUEUR 1")
+	_controller_player_select.add_item("ELLE CONTROLE LE JOUEUR 2")
+	_style_option(_controller_player_select)
+	_controller_player_select.item_selected.connect(_controller_player_selected)
+	assignment_row.add_child(_controller_player_select)
+	_controller_status = Label.new()
+	_controller_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_controller_status.custom_minimum_size.y = 26
+	_controller_status.add_theme_color_override("font_color", Color(0.54, 0.76, 1.0))
+	column.add_child(_controller_status)
+	_add_section(column, "COMPORTEMENT DU STICK GAUCHE")
+	var settings_grid := GridContainer.new()
+	settings_grid.columns = 3
+	settings_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	settings_grid.add_theme_constant_override("h_separation", 16)
+	settings_grid.add_theme_constant_override("v_separation", 14)
+	column.add_child(settings_grid)
+	_deadzone_slider = _add_stick_slider(settings_grid, "ZONE MORTE", 0.05, 0.40, 0.01)
+	_deadzone_value = settings_grid.get_child(settings_grid.get_child_count() - 1) as Label
+	_sensitivity_slider = _add_stick_slider(settings_grid, "SENSIBILITE", 0.60, 1.50, 0.05)
+	_sensitivity_value = settings_grid.get_child(settings_grid.get_child_count() - 1) as Label
+	_deadzone_slider.value_changed.connect(_deadzone_changed)
+	_sensitivity_slider.value_changed.connect(_sensitivity_changed)
+	_stick_preview = StickPreview.new()
+	_stick_preview.custom_minimum_size = Vector2(650, 58)
+	_stick_preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_stick_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_stick_preview)
+	_stick_live_label = Label.new()
+	_stick_live_label.text = "Branche une manette et bouge le stick pour tester."
+	_stick_live_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_stick_live_label.add_theme_color_override("font_color", Color(0.76, 0.82, 0.94))
+	column.add_child(_stick_live_label)
+	var legend := Label.new()
+	legend.text = "Point gris : position physique du stick    Point jaune : mouvement transmis au combattant"
+	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	legend.add_theme_font_size_override("font_size", 13)
+	legend.add_theme_color_override("font_color", Color(0.62, 0.70, 0.86))
+	column.add_child(legend)
+	var bottom := HBoxContainer.new()
+	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
+	bottom.add_theme_constant_override("separation", 16)
+	column.add_child(bottom)
+	var defaults := _menu_button("VALEURS CONSEILLEES")
+	defaults.pressed.connect(_reset_stick_settings)
+	bottom.add_child(defaults)
+	var back := _menu_button("RETOUR AUX TOUCHES")
+	back.pressed.connect(_show_controls)
+	bottom.add_child(back)
+	_refresh_controller_settings()
+
+
+func _add_stick_slider(grid: GridContainer, label_text: String, minimum: float,
+		maximum: float, step: float) -> HSlider:
+	var label := Label.new()
+	label.text = label_text
+	label.custom_minimum_size.x = 170
+	grid.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = minimum
+	slider.max_value = maximum
+	slider.step = step
+	slider.custom_minimum_size = Vector2(370, 34)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(slider)
+	var value_label := Label.new()
+	value_label.custom_minimum_size.x = 95
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.30))
+	grid.add_child(value_label)
+	return slider
 
 
 func _build_skins_page() -> void:
@@ -518,10 +711,13 @@ func _stage_selected(index: int) -> void:
 func _show_main() -> void:
 	_capture_player = -1
 	_capture_action = ""
+	_capture_kind = ""
 	if _main_page:
 		_main_page.visible = true
 	if _controls_page:
 		_controls_page.visible = false
+	if _controller_page:
+		_controller_page.visible = false
 	if _skins_page:
 		_skins_page.visible = false
 	if _stages_page:
@@ -532,15 +728,20 @@ func _show_main() -> void:
 func _show_controls() -> void:
 	_main_page.visible = false
 	_controls_page.visible = true
+	_controller_page.visible = false
 	_skins_page.visible = false
 	_stages_page.visible = false
 	_capture_status.text = ""
 	_refresh_key_buttons()
+	var first_button := _key_buttons.get(_key_id(0, "left")) as Button
+	if first_button:
+		first_button.call_deferred("grab_focus")
 
 
 func _show_skins() -> void:
 	_main_page.visible = false
 	_controls_page.visible = false
+	_controller_page.visible = false
 	_skins_page.visible = true
 	_stages_page.visible = false
 	_refresh_skin_choices()
@@ -549,12 +750,91 @@ func _show_skins() -> void:
 func _show_stages() -> void:
 	_main_page.visible = false
 	_controls_page.visible = false
+	_controller_page.visible = false
 	_skins_page.visible = false
 	_stages_page.visible = true
 	_refresh_stage_choices()
 
 
+func _show_controller_settings() -> void:
+	_main_page.visible = false
+	_controls_page.visible = false
+	_controller_page.visible = true
+	_skins_page.visible = false
+	_stages_page.visible = false
+	_refresh_controller_settings()
+	_controller_player_select.call_deferred("grab_focus")
+
+
+func _refresh_controller_settings() -> void:
+	if _controller_player_select == null:
+		return
+	_controller_player_select.select(GameSettings.single_controller_player())
+	_deadzone_slider.set_value_no_signal(GameSettings.stick_deadzone())
+	_sensitivity_slider.set_value_no_signal(GameSettings.stick_sensitivity())
+	_update_stick_setting_labels()
+	var pads := Input.get_connected_joypads()
+	if pads.is_empty():
+		_controller_status.text = "Aucune manette detectee pour le moment. Tu peux la brancher sans relancer le jeu."
+		_controller_status.add_theme_color_override("font_color", Color(1.0, 0.62, 0.36))
+	elif pads.size() == 1:
+		_controller_status.text = "%s detectee — elle controlera le joueur %d." % [
+			Input.get_joy_name(pads[0]), GameSettings.single_controller_player() + 1,
+		]
+		_controller_status.add_theme_color_override("font_color", Color(0.48, 0.90, 0.62))
+	else:
+		_controller_status.text = "%d manettes detectees — la premiere controle J1 et la deuxieme J2." % pads.size()
+		_controller_status.add_theme_color_override("font_color", Color(0.48, 0.90, 0.62))
+
+
+func _controller_player_selected(index: int) -> void:
+	GameSettings.set_single_controller_player(index)
+	_refresh_controller_settings()
+
+
+func _deadzone_changed(value: float) -> void:
+	GameSettings.set_stick_deadzone(value)
+	_update_stick_setting_labels()
+
+
+func _sensitivity_changed(value: float) -> void:
+	GameSettings.set_stick_sensitivity(value)
+	_update_stick_setting_labels()
+
+
+func _update_stick_setting_labels() -> void:
+	if _deadzone_value:
+		_deadzone_value.text = "%d %%" % roundi(GameSettings.stick_deadzone() * 100.0)
+	if _sensitivity_value:
+		_sensitivity_value.text = "%d %%" % roundi(GameSettings.stick_sensitivity() * 100.0)
+
+
+func _reset_stick_settings() -> void:
+	GameSettings.set_stick_deadzone(GameSettings.DEFAULT_STICK_DEADZONE)
+	GameSettings.set_stick_sensitivity(GameSettings.DEFAULT_STICK_SENSITIVITY)
+	_refresh_controller_settings()
+
+
+func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
+	_refresh_controller_settings()
+
+
+func _process(_delta: float) -> void:
+	if _controller_page == null or not _controller_page.visible or _stick_preview == null:
+		return
+	var pads := Input.get_connected_joypads()
+	var raw := Input.get_joy_axis(pads[0], JOY_AXIS_LEFT_X) if not pads.is_empty() else 0.0
+	var shaped := Fighter.shape_stick_axis(raw)
+	_stick_preview.update_values(raw, shaped)
+	if pads.is_empty():
+		_stick_live_label.text = "Branche une manette et bouge le stick pour tester."
+	else:
+		_stick_live_label.text = "Stick horizontal : %+.2f    Mouvement obtenu : %+.2f" % [raw, shaped]
+
+
 func _start_capture(player: int, action: String) -> void:
+	_capture_focus_button = get_viewport().gui_get_focus_owner() as Button
+	_capture_kind = "keyboard"
 	_capture_player = player
 	_capture_action = action
 	_capture_status.text = "Appuie maintenant sur la touche pour : Joueur %d - %s\nEchap pour annuler." % [
@@ -563,40 +843,118 @@ func _start_capture(player: int, action: String) -> void:
 	get_viewport().gui_release_focus()
 
 
-func _start_reset_capture() -> void:
-	_capture_player = 2
-	_capture_action = "reset"
-	_capture_status.text = "Appuie maintenant sur la touche pour recommencer la partie.\nEchap pour annuler."
+func _start_pad_capture(player: int, action: String) -> void:
+	_capture_focus_button = get_viewport().gui_get_focus_owner() as Button
+	_capture_kind = "controller"
+	_capture_player = player
+	_capture_action = action
+	_capture_status.text = "Appuie sur un bouton de manette pour : Joueur %d - %s\nLes gachettes LT et RT sont aussi acceptees. Echap pour annuler." % [
+		player + 1, GameSettings.ACTION_LABELS[action],
+	]
 	get_viewport().gui_release_focus()
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
+func _start_global_capture(kind: String, action: String) -> void:
+	_capture_focus_button = get_viewport().gui_get_focus_owner() as Button
+	_capture_kind = kind
+	_capture_player = -2
+	_capture_action = action
+	var device_name := "touche du clavier" if kind == "keyboard" else "bouton de manette"
+	var action_name := "recommencer la partie" if action == "reset" else "mettre en pause"
+	_capture_status.text = "Appuie maintenant sur la %s pour %s.\nEchap pour annuler." % [
+		device_name, action_name,
+	]
+	get_viewport().gui_release_focus()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _capture_kind != "":
+		if event is InputEventKey and event.pressed and not event.echo \
+		and event.keycode == KEY_ESCAPE:
+			_cancel_capture()
+			get_viewport().set_input_as_handled()
+			return
+		if _capture_kind == "keyboard":
+			_capture_keyboard_event(event)
+		else:
+			_capture_controller_event(event)
+		return
+	if event is InputEventKey and event.pressed and not event.echo \
+	and (_controls_page.visible or _controller_page.visible \
+		or _skins_page.visible or _stages_page.visible) \
+	and event.keycode == KEY_ESCAPE:
+		if _controller_page.visible:
+			_show_controls()
+		else:
+			_show_main()
+		get_viewport().set_input_as_handled()
+
+
+func _capture_keyboard_event(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
+	var code := int(event.keycode)
+	if code == KEY_F10:
+		_capture_status.text = "Cette touche est reservee au jeu. Choisis-en une autre, ou Echap pour annuler."
+		get_viewport().set_input_as_handled()
+		return
 	if _capture_player >= 0:
-		if event.keycode == KEY_ESCAPE:
-			_capture_player = -1
-			_capture_action = ""
-			_capture_status.text = "Modification annulee."
-			get_viewport().set_input_as_handled()
-			return
-		var code := int(event.keycode)
-		if code == KEY_F10:
-			_capture_status.text = "Cette touche est reservee au jeu. Choisis-en une autre, ou Echap pour annuler."
-			get_viewport().set_input_as_handled()
-			return
-		if _capture_player == 2:
-			GameSettings.assign_reset_key(code)
-		else:
-			GameSettings.assign_key(_capture_player, _capture_action, code)
-		_capture_player = -1
-		_capture_action = ""
-		_capture_status.text = "Touche enregistree."
-		_refresh_key_buttons()
+		GameSettings.assign_key(_capture_player, _capture_action, code)
+	elif _capture_action == "reset":
+		GameSettings.assign_reset_key(code)
+	else:
+		GameSettings.assign_pause_key(code)
+	_finish_capture("Touche clavier enregistree et sauvegardee.")
+	get_viewport().set_input_as_handled()
+
+
+func _capture_controller_event(event: InputEvent) -> void:
+	var binding: Dictionary = {}
+	if event is InputEventJoypadButton and event.pressed:
+		binding = GameSettings.pad_binding_from_button(event.button_index)
+	elif event is InputEventJoypadMotion \
+	and event.axis in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT] \
+	and event.axis_value >= 0.72:
+		binding = GameSettings.pad_binding_from_trigger(event.axis)
+	if binding.is_empty():
+		return
+	var accepted := false
+	if _capture_player >= 0:
+		accepted = GameSettings.assign_controller_binding(
+			_capture_player, _capture_action, binding)
+	elif _capture_action == "reset":
+		accepted = GameSettings.assign_controller_reset(binding)
+	else:
+		accepted = GameSettings.assign_controller_pause(binding)
+	if not accepted:
+		_capture_status.text = "Ce bouton est deja reserve a une autre commande. Choisis-en un autre, ou Echap pour annuler."
 		get_viewport().set_input_as_handled()
-	elif (_controls_page.visible or _skins_page.visible or _stages_page.visible) and event.keycode == KEY_ESCAPE:
-		_show_main()
-		get_viewport().set_input_as_handled()
+		return
+	_finish_capture("Bouton de manette enregistre et sauvegarde.")
+	get_viewport().set_input_as_handled()
+
+
+func _cancel_capture() -> void:
+	_capture_kind = ""
+	_capture_player = -1
+	_capture_action = ""
+	_capture_status.text = "Modification annulee."
+	_restore_capture_focus()
+
+
+func _finish_capture(message: String) -> void:
+	_capture_kind = ""
+	_capture_player = -1
+	_capture_action = ""
+	_capture_status.text = message
+	_refresh_key_buttons()
+	_restore_capture_focus()
+
+
+func _restore_capture_focus() -> void:
+	if is_instance_valid(_capture_focus_button):
+		_capture_focus_button.call_deferred("grab_focus")
+	_capture_focus_button = null
 
 
 func _reset_controls() -> void:
@@ -611,8 +969,18 @@ func _refresh_key_buttons() -> void:
 			var button: Button = _key_buttons.get(_key_id(player, action))
 			if button:
 				button.text = GameSettings.key_name(player, action)
+			var pad_button: Button = _pad_buttons.get(_key_id(player, action))
+			if pad_button:
+				pad_button.text = GameSettings.controller_binding_name(player, action) \
+					if action in GameSettings.PAD_ACTIONS else "Stick + croix"
 	if _reset_button:
 		_reset_button.text = GameSettings.reset_key_name()
+	if _pause_key_button:
+		_pause_key_button.text = GameSettings.pause_key_name()
+	if _pad_reset_button:
+		_pad_reset_button.text = GameSettings.controller_reset_name()
+	if _pad_pause_button:
+		_pad_pause_button.text = GameSettings.controller_pause_name()
 
 
 func _key_id(player: int, action: String) -> String:
